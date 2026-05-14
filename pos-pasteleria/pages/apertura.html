@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apertura de Caja - POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* Estilo para mejorar la visualización de números */
+        .money-input {
+            font-family: monospace;
+            font-size: 1.2rem;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<nav class="main-nav">
+            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+</nav> 
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h2>🚀 Apertura de Caja</h2>
+            <p id="fechaDisplay"></p>
+            
+            <form id="formApertura">
+                <div class="form-group">
+                    <label>💰 Base en billetes</label>
+                    <input type="text" id="baseBilletes" class="money-input" 
+                           placeholder="Ej: 150.000" required
+                           oninput="formatearNumero(this)"
+                           onblur="formatearNumeroCompleto(this)">
+                    <small>Monto total en billetes físicos disponibles.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>🪙 Base en monedas</label>
+                    <input type="text" id="baseMonedas" class="money-input" 
+                           placeholder="Ej: 15.000" required
+                           oninput="formatearNumero(this)"
+                           onblur="formatearNumeroCompleto(this)">
+                    <small>Monto total en monedas para dar cambio.</small>
+                </div>
+                
+                <button type="button" onclick="registrarApertura()" class="btn btn-primary">
+                    ✅ Registrar apertura
+                </button>
+                <button type="button" onclick="window.location.href='../index.html'" class="btn">
+                    ⬅️ Cancelar
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="../js/database.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        // Mostrar fecha
+        document.getElementById('fechaDisplay').innerHTML = new Date().toLocaleDateString('es-ES', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+        
+        // ==================== FUNCIONES PARA FORMATEAR NÚMEROS ====================
+        
+        // Función para formatear número mientras se escribe
+        function formatearNumero(input) {
+            // Obtener el valor actual y eliminar cualquier carácter que no sea número
+            let valor = input.value.replace(/[^0-9]/g, '');
+            
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
+            
+            // Convertir a número entero
+            let numero = parseInt(valor, 10);
+            
+            // Formatear con puntos de mil
+            input.value = numero.toLocaleString('es-ES');
+        }
+        
+        // Función para formatear al perder el foco (completar)
+        function formatearNumeroCompleto(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
+            
+            let numero = parseInt(valor, 10);
+            input.value = numero.toLocaleString('es-ES');
+        }
+        
+        // Función para obtener el valor numérico real (sin puntos)
+        function obtenerValorNumerico(inputId) {
+            const input = document.getElementById(inputId);
+            let valor = input.value.replace(/[^0-9]/g, '');
+            return valor === '' ? 0 : parseInt(valor, 10);
+        }
+        
+        // Función para registrar apertura (modificada)
+        function registrarApertura() {
+            // Obtener los valores numéricos reales
+            const billetes = obtenerValorNumerico('baseBilletes');
+            const monedas = obtenerValorNumerico('baseMonedas');
+            
+            // Validar
+            if (billetes === 0 && monedas === 0) {
+                alert('❌ Por favor, ingresa la base inicial de efectivo');
+                return;
+            }
+            
+            // Mostrar resumen
+            const total = billetes + monedas;
+            const confirmar = confirm(`✅ Confirmar apertura:\n\n💰 Billetes: $${billetes.toLocaleString('es-ES')}\n🪙 Monedas: $${monedas.toLocaleString('es-ES')}\n📊 Total base: $${total.toLocaleString('es-ES')}\n\n¿Deseas continuar?`);
+            
+            if (!confirmar) return;
+            
+            // Crear objeto de apertura
+            const apertura = {
+                base_billetes: billetes,
+                base_monedas: monedas,
+                base_total: total,
+                fecha: new Date().toISOString(),
+                usuario: 'cajero',
+                estado: 'abierta'
+            };
+            
+            // Guardar en la base de datos
+            DB.add('aperturas_caja', apertura);
+            
+            // Mostrar mensaje de éxito
+            alert(`✅ ¡Apertura registrada con éxito!\n\n💰 Base total: $${total.toLocaleString('es-ES')}\n\nRedirigiendo a la página de ventas...`);
+            
+            // Redirigir a ventas
+            window.location.href = 'ventas.html';
+        }
+        
+        // Función para permitir solo números al pegar contenido
+        function sanitizarPegado(input) {
+            setTimeout(() => {
+                let valor = input.value.replace(/[^0-9]/g, '');
+                if (valor === '') {
+                    input.value = '';
+                } else {
+                    let numero = parseInt(valor, 10);
+                    input.value = numero.toLocaleString('es-ES');
+                }
+            }, 10);
+        }
+        
+        // Agregar evento para limpiar pegado
+        document.getElementById('baseBilletes').addEventListener('paste', function() {
+            sanitizarPegado(this);
+        });
+        
+        document.getElementById('baseMonedas').addEventListener('paste', function() {
+            sanitizarPegado(this);
+        });
+        
+        // Hacer que las funciones sean globales
+        window.registrarApertura = registrarApertura;
+        window.formatearNumero = formatearNumero;
+        window.formatearNumeroCompleto = formatearNumeroCompleto;
+    </script>
+</body>
+</html>

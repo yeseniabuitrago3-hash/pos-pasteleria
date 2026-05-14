@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Pastelería - Sistema de Caja</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <h1> POS Pastelería</h1>
+                <span class="fecha" id="fechaActual"></span>
+            </div>
+            <div class="turno-info">
+                <span id="estadoTurno" class="estado-cerrado">🔴 Turno cerrado</span>
+                <span id="baseInfo" class="base-info"></span>
+            </div>
+        </header>
+
+        <!-- Menu principal -->
+        <nav class="main-nav">
+            <button onclick="window.location.href='pages/apertura.html'" class="nav-btn">
+                🚀 Apertura
+            </button>
+            <button onclick="window.location.href='pages/ventas.html'" class="nav-btn">
+                💰 Ventas
+            </button>
+            <button onclick="window.location.href='pages/cierre.html'" class="nav-btn">
+                📊 Cierre
+            </button>
+            <button onclick="window.location.href='pages/historial.html'" class="nav-btn">
+                📜 Historial
+            </button>
+            <button onclick="window.location.href='pages/inventario.html'" class="nav-btn">
+                📦 Inventario
+            </button>
+            <button onclick="window.location.href='pages/recibir_pedido.html'" class="nav-btn">
+        📥 Recibir Pedido
+    </button>
+              <button onclick="window.location.href='pages/dashboard_analisis.html'" class="nav-btn nav-btn-active">📈 Análisis</button>
+        </nav>
+
+       <!-- Dashboard resumen -->
+<div class="dashboard">
+    <div class="card">
+        <h3>📈 Ventas de este turno</h3>
+        <div class="card-stats">
+            <p>🍰 Pasteles: <span id="resumenPasteles">$0</span></p>
+            <i class="fas fa-cake"></i> 
+            <p>🥤 Bebidas: <span id="resumenBebidas">$0</span></p>
+            <p>💰 Total Efectivo: <span id="resumenTotal">$0</span></p>
+            <p>📱 Nequi: <span id="resumenNequi">$0</span></p>   
+            <!-- ← AGREGAR ESTA LÍNEA -->
+        </div>
+    </div>
+    <div class="card">
+        <h3>⚠️ Stock crítico</h3>
+        <div id="alertasStock" class="alertas-stock">
+            <p>Cargando...</p>
+        </div>
+    </div>
+</div>
+     
+        <!-- Información del turno actual -->
+        <div class="card" id="infoTurno" style="text-align: center;">
+            <p id="mensajeTurno">💰 No hay turno activo. Realiza una apertura para comenzar.</p>
+        </div>
+    </div>
+
+     <script>
+        // ==================== FUNCIONES PRINCIPALES ====================
+        
+        function actualizarFecha() {
+            const hoy = new Date();
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const fechaElement = document.getElementById('fechaActual');
+            if (fechaElement) {
+                fechaElement.textContent = hoy.toLocaleDateString('es-ES', opciones);
+            }
+        }
+
+        function actualizarEstadoTurno() {
+    const apertura = getAperturaActual();
+    const estadoSpan = document.getElementById('estadoTurno');
+    const baseSpan = document.getElementById('baseInfo');
+    const mensajeTurno = document.getElementById('mensajeTurno');
+    
+    if (apertura) {
+        estadoSpan.className = 'estado-abierto';
+        estadoSpan.innerHTML = '🟢 Turno abierto';
+        // ❌ ELIMINA O COMENTA ESTA LÍNEA para que no aparezca la base
+        // if (baseSpan) baseSpan.innerHTML = `Base: $${apertura.base_total.toLocaleString('es-ES')}`;
+        
+        if (mensajeTurno) {
+            mensajeTurno.innerHTML = `✅ TURNO ACTIVO - Iniciado: ${new Date(apertura.fecha).toLocaleTimeString()}`;
+            mensajeTurno.style.fontWeight = 'bold';
+        }
+    } else {
+        estadoSpan.className = 'estado-cerrado';
+        estadoSpan.innerHTML = '🔴 Turno cerrado';
+        if (baseSpan) baseSpan.innerHTML = '';
+        if (mensajeTurno) {
+            mensajeTurno.innerHTML = '🔴 No hay turno activo. Haz clic en "Apertura" para comenzar un nuevo turno.';
+            mensajeTurno.style.color = '#e74c3c';
+            mensajeTurno.style.fontWeight = 'normal';
+        }
+    }
+}
+        // Actualizar dashboard con SOLO las ventas del turno actual
+        function actualizarDashboard() {
+            const apertura = getAperturaActual();
+            
+            if (apertura) {
+                // Obtener ventas SOLO de este turno
+                const ventasPasteles = DB.find('ventas_pasteles', 'apertura_id', apertura.id);
+                const ventasBebidas = DB.find('ventas_bebidas', 'apertura_id', apertura.id);
+                const transferencias = DB.find('transferencias_nequi', 'apertura_id', apertura.id);
+                
+                const totalPasteles = ventasPasteles.reduce((sum, v) => sum + v.total, 0);
+                const totalBebidas = ventasBebidas.reduce((sum, v) => sum + v.subtotal, 0);
+                const totalNequi = transferencias.reduce((sum, t) => sum + t.monto, 0);
+                
+                document.getElementById('resumenPasteles').textContent = `$${totalPasteles.toLocaleString('es-ES')}`;
+                document.getElementById('resumenBebidas').textContent = `$${totalBebidas.toLocaleString('es-ES')}`;
+                document.getElementById('resumenTotal').textContent = `$${(totalPasteles + totalBebidas).toLocaleString('es-ES')}`;
+                document.getElementById('resumenNequi').textContent = `$${totalNequi.toLocaleString('es-ES')}`;
+            } else {
+                // No hay turno activo, mostrar ceros
+                document.getElementById('resumenPasteles').textContent = '$0';
+                document.getElementById('resumenBebidas').textContent = '$0';
+                document.getElementById('resumenTotal').textContent = '$0';
+                document.getElementById('resumenNequi').textContent = '$0';
+            }
+            
+            // Actualizar alertas de stock
+            actualizarAlertasStock();
+        }
+        
+        function actualizarAlertasStock() {
+            const productos = DB.get('productos');
+            if (!productos || productos.length === 0) {
+                document.getElementById('alertasStock').innerHTML = '<p>📦 No hay productos registrados</p>';
+                return;
+            }
+            
+            const productosCriticos = productos.filter(p => p.stock_actual <= p.stock_minimo);
+            const alertasDiv = document.getElementById('alertasStock');
+            
+            if (productosCriticos.length === 0) {
+                alertasDiv.innerHTML = '<p>✅ Todos los productos tienen stock suficiente</p>';
+            } else {
+                let html = '';
+                productosCriticos.forEach(p => {
+                    html += `<div class="alert-stock" style="background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #f39c12;">
+                        <strong>⚠️ ${p.nombre}</strong><br>
+                        Stock actual: ${p.stock_actual} (Mínimo: ${p.stock_minimo})
+                    </div>`;
+                });
+                alertasDiv.innerHTML = html;
+            }
+        }
+
+        // ==================== INICIALIZACIÓN ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Iniciando POS Pastelería...');
+            actualizarFecha();
+            actualizarEstadoTurno();
+            actualizarDashboard();
+            
+            // Actualizar cada 10 segundos
+            setInterval(() => {
+                actualizarEstadoTurno();
+                actualizarDashboard();
+            }, 10000);
+        });
+    </script>
+
+
+
+
+
+    <script src="js/database.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

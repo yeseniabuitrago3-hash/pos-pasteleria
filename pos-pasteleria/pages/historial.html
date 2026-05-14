@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Cierres - POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+
+             /* Para el botón "Ver más" */
+        .btn-ver-mas {
+         background: #8B4513;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer; 
+        font-weight: bold;
+        margin: 20px auto;
+        display: block;
+        width: 200px;
+        transition: all 0.3s;
+      }
+        .btn-ver-mas:hover {
+         background: #5C2E0A;
+        transform: scale(1.02);
+        }
+        .filtros {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .filtros .form-group {
+            margin-bottom: 0;
+            flex: 1;
+            min-width: 150px;
+        }
+        .filtros button {
+            height: 42px;
+        }
+        .resumen-totales {
+            background: linear-gradient(135deg, #8B4513, #5C2E0A);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .resumen-totales div {
+            text-align: center;
+        }
+        .resumen-totales strong {
+            font-size: 1.8rem;
+            display: block;
+        }
+        .diferencia-positiva {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .diferencia-negativa {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            margin: 0 2px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+        }
+        .btn-ver {
+            background: #3498db;
+            color: white;
+        }
+        .btn-exportar {
+            background: #27ae60;
+            color: white;
+        }
+        .detalle-modal {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .detalle-item {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        .detalle-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📜 Historial de Cierres</h1>
+            <div class="fecha" id="fechaActual"></div>
+        </div>
+
+        <nav class="main-nav">
+            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+</nav>
+
+        <!-- Filtros -->
+        <div class="card">
+            <h3>🔍 Filtrar por fecha</h3>
+            <div class="filtros">
+                <div class="form-group">
+                    <label>Desde:</label>
+                    <input type="date" id="fechaDesde">
+                </div>
+                <div class="form-group">
+                    <label>Hasta:</label>
+                    <input type="date" id="fechaHasta">
+                </div>
+                <button onclick="filtrarHistorial()" class="btn btn-primary">🔍 Filtrar</button>
+                <button onclick="limpiarFiltros()" class="btn">🗑️ Limpiar</button>
+                <button onclick="exportarReporte()" class="btn btn-success">📊 Exportar a Excel</button>
+            </div>
+        </div>
+
+      
+
+        <!-- Tabla de historial -->
+        <div class="card">
+            <h3>📋 Reportes de caja</h3>
+            <div class="table-container">
+                <table id="tablaHistorial">
+                    <thead>
+                        <tr>
+                            <th>Fecha / Hora</th>
+                            <th>Base Inicial</th>
+                            <th>Ventas Efectivo</th>
+                            <th>Total Nequi</th>
+                            <th>Efectivo Esperado</th>
+                            <th>Efectivo Contado</th>
+                            <th>Diferencia</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoHistorial">
+                        <tr><td colspan="8">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
+        <!-- Después del cierre de la tabla -->
+        <div style="text-align: center;">
+        <button id="btnVerMas" class="btn-ver-mas" style="display: none;">📋 Ver más registros</button>
+        </div>
+
+        <!-- Botón volver -->
+        <div style="margin-top: 20px;">
+            <button onclick="window.location.href='../index.html'" class="btn">⬅️ Volver al inicio</button>
+        </div>
+    </div>
+
+    <!-- Modal de detalle -->
+    <div id="modalDetalle" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>📋 Detalle del cierre</h2>
+                <span class="close-modal" onclick="cerrarModalDetalle()">&times;</span>
+            </div>
+            <div id="detalleContenido" class="detalle-modal"></div>
+        </div>
+    </div>
+
+    <script src="../js/database.js"></script>
+    <script src="../js/scanner.js"></script>
+    <script>
+
+
+        let cierresTotales = [];       // Todos los registros (sin filtrar)
+    let cierresFiltrados = [];     // Registros después de aplicar filtros
+    let registrosMostrados = 0;    // Cuántos registros ya se mostraron
+    const REGISTROS_POR_PAGINA = 5; // Mostrar 5 al inicio
+
+    // Actualizar fecha
+    function actualizarFecha() {
+        const hoy = new Date();
+        document.getElementById('fechaActual').textContent = hoy.toLocaleDateString('es-ES', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+    }
+
+    // Agregar una fila a la tabla
+    function agregarFilaTabla(cierre) {
+        const tbody = document.getElementById('cuerpoHistorial');
+        const fecha = new Date(cierre.fecha_cierre);
+        const fechaFormateada = fecha.toLocaleDateString('es-ES') + '<br>' + fecha.toLocaleTimeString('es-CO');
+        const diferenciaClase = cierre.diferencia >= 0 ? 'diferencia-positiva' : 'diferencia-negativa';
+        const diferenciaTexto = cierre.diferencia >= 0 ? `+$${Math.abs(cierre.diferencia).toLocaleString()}` : `-$${Math.abs(cierre.diferencia).toLocaleString()}`;
+        const totalVentasEfectivo = (cierre.total_ventas_pasteles + cierre.total_ventas_bebidas);
+        
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${fechaFormateada}</td>
+            <td>$${cierre.base_total.toLocaleString()}</td>
+            <td>$${totalVentasEfectivo.toLocaleString()}</td>
+            <td>$${cierre.total_nequi.toLocaleString()}</td>
+            <td>$${cierre.efectivo_esperado.toLocaleString()}</td>
+            <td>$${cierre.efectivo_contado.toLocaleString()}</td>
+            <td class="${diferenciaClase}">${diferenciaTexto}</td>
+            <td><button class="btn-sm btn-ver" onclick="verDetalle(${cierre.id})">👁️ Ver</button></td>
+        `;
+        tbody.appendChild(fila);
+    }
+
+    // Cargar más registros (siguiente lote)
+    function cargarMasRegistros() {
+        const siguienteLote = cierresFiltrados.slice(registrosMostrados, registrosMostrados + REGISTROS_POR_PAGINA);
+        
+        if (siguienteLote.length === 0) {
+            document.getElementById('btnVerMas').style.display = 'none';
+            return;
+        }
+        
+        if (registrosMostrados === 0) {
+            document.getElementById('cuerpoHistorial').innerHTML = '';
+        }
+        
+        siguienteLote.forEach(cierre => {
+            agregarFilaTabla(cierre);
+        });
+        
+        registrosMostrados += siguienteLote.length;
+        
+        if (registrosMostrados < cierresFiltrados.length) {
+            document.getElementById('btnVerMas').style.display = 'block';
+        } else {
+            document.getElementById('btnVerMas').style.display = 'none';
+        }
+    }
+
+    // Actualizar resumen de totales (según los datos filtrados)
+    function actualizarResumenTotales(historial) {
+        const totalCierres = historial.length;
+        const totalVentas = historial.reduce((sum, c) => sum + (c.total_ventas_pasteles || 0) + (c.total_ventas_bebidas || 0), 0);
+        const totalNequi = historial.reduce((sum, c) => sum + (c.total_nequi || 0), 0);
+        const totalDescuadres = historial.reduce((sum, c) => sum + Math.abs(c.diferencia || 0), 0);
+        
+        document.getElementById('totalCierres').textContent = totalCierres;
+        document.getElementById('totalVentas').textContent = `$${totalVentas.toLocaleString()}`;
+        document.getElementById('totalNequiGlobal').textContent = `$${totalNequi.toLocaleString()}`;
+        document.getElementById('totalDescuadres').textContent = `$${totalDescuadres.toLocaleString()}`;
+    }
+
+    // Cargar historial completo (paginado)
+    function cargarHistorial() {
+        const cierres = DB.get('cierres_caja');
+        const aperturas = DB.get('aperturas_caja');
+        
+        cierresTotales = cierres.map(cierre => {
+            const apertura = aperturas.find(a => a.id === cierre.apertura_id);
+            return {
+                ...cierre,
+                base_total: apertura ? apertura.base_total : 0,
+                base_billetes: apertura ? apertura.base_billetes : 0,
+                base_monedas: apertura ? apertura.base_monedas : 0
+            };
+        });
+        
+        // Ordenar de más reciente a más antiguo
+        cierresTotales.sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
+        
+        // Inicializar filtrados
+        cierresFiltrados = [...cierresTotales];
+        registrosMostrados = 0;
+        document.getElementById('cuerpoHistorial').innerHTML = '';
+        cargarMasRegistros();
+        actualizarResumenTotales(cierresFiltrados);
+    }
+
+    // Filtrar por fechas
+    function filtrarHistorial() {
+        let desde = document.getElementById('fechaDesde').value;
+        let hasta = document.getElementById('fechaHasta').value;
+        
+        let filtrados = [...cierresTotales];
+        
+        if (desde) {
+            const fechaDesde = new Date(desde);
+            fechaDesde.setHours(0, 0, 0, 0);
+            filtrados = filtrados.filter(c => new Date(c.fecha_cierre) >= fechaDesde);
+        }
+        if (hasta) {
+            const fechaHasta = new Date(hasta);
+            fechaHasta.setHours(23, 59, 59, 999);
+            filtrados = filtrados.filter(c => new Date(c.fecha_cierre) <= fechaHasta);
+        }
+        
+        cierresFiltrados = filtrados;
+        registrosMostrados = 0;
+        document.getElementById('cuerpoHistorial').innerHTML = '';
+        cargarMasRegistros();
+        actualizarResumenTotales(cierresFiltrados);
+    }
+
+    // Limpiar filtros
+    function limpiarFiltros() {
+        document.getElementById('fechaDesde').value = '';
+        document.getElementById('fechaHasta').value = '';
+        cierresFiltrados = [...cierresTotales];
+        registrosMostrados = 0;
+        document.getElementById('cuerpoHistorial').innerHTML = '';
+        cargarMasRegistros();
+        actualizarResumenTotales(cierresFiltrados);
+    }
+
+    // Ver detalle de un cierre
+    function verDetalle(cierreId) {
+        const cierre = cierresFiltrados.find(c => c.id === cierreId);
+        if (!cierre) return;
+        
+        const ventasPasteles = DB.find('ventas_pasteles', 'apertura_id', cierre.apertura_id);
+        const ventasBebidas = DB.find('ventas_bebidas', 'apertura_id', cierre.apertura_id);
+        const transferencias = DB.find('transferencias_nequi', 'apertura_id', cierre.apertura_id);
+        const productos = DB.get('productos');
+        
+        let html = `
+            <div class="detalle-item">
+                <strong>📅 Fecha de cierre:</strong> ${new Date(cierre.fecha_cierre).toLocaleString()}
+            </div>
+            <div class="detalle-item">
+                <strong>💰 Base inicial:</strong> $${(cierre.base_total || 0).toLocaleString()}
+                <small>($${(cierre.base_billetes || 0).toLocaleString()} billetes + $${(cierre.base_monedas || 0).toLocaleString()} monedas)</small>
+            </div>
+            <div class="detalle-item">
+                <strong>🍰 Pasteles vendidos:</strong> ${ventasPasteles.reduce((sum, v) => sum + (v.cantidad || 0), 0)} unidades = $${(cierre.total_ventas_pasteles || 0).toLocaleString()}
+            </div>
+            <div class="detalle-item">
+                <strong>🥤 Bebidas vendidas:</strong> ${ventasBebidas.length} unidades = $${(cierre.total_ventas_bebidas || 0).toLocaleString()}
+            </div>
+            <div class="detalle-item">
+                <strong>📱 Transferencias Nequi:</strong> ${transferencias.length} transacciones = $${(cierre.total_nequi || 0).toLocaleString()}
+            </div>
+            <div class="detalle-item">
+                <strong>💵 Total en efectivo esperado:</strong> $${(cierre.efectivo_esperado || 0).toLocaleString()}
+            </div>
+            <div class="detalle-item">
+                <strong>💵 Efectivo contado:</strong> $${(cierre.efectivo_contado || 0).toLocaleString()}
+            </div>
+            <div class="detalle-item">
+                <strong>⚠️ Diferencia:</strong> ${cierre.diferencia >= 0 ? `+$${cierre.diferencia.toLocaleString()}` : `-$${Math.abs(cierre.diferencia).toLocaleString()}`}
+            </div>
+        `;
+        
+        if (ventasBebidas.length > 0) {
+            html += `<div class="detalle-item"><strong>🥤 Detalle de bebidas vendidas:</strong><br>`;
+            ventasBebidas.forEach(v => {
+                const producto = productos.find(p => p.id === v.producto_id);
+                html += `- ${producto ? producto.nombre : 'Producto'} x1 = $${(v.subtotal || 0).toLocaleString()}<br>`;
+            });
+            html += `</div>`;
+        }
+        
+        if (cierre.observaciones) {
+            html += `<div class="detalle-item"><strong>📝 Observaciones:</strong><br>${cierre.observaciones}</div>`;
+        }
+        
+        document.getElementById('detalleContenido').innerHTML = html;
+        document.getElementById('modalDetalle').style.display = 'flex';
+    }
+
+    function cerrarModalDetalle() {
+        document.getElementById('modalDetalle').style.display = 'none';
+    }
+
+    // Exportar a CSV
+    function exportarReporte() {
+        if (cierresFiltrados.length === 0) {
+            alert('No hay datos para exportar');
+            return;
+        }
+        
+        const cabeceras = ['Fecha', 'Hora', 'Base Inicial', 'Ventas Efectivo', 'Total Nequi', 'Efectivo Esperado', 'Efectivo Contado', 'Diferencia', 'Observaciones'];
+        const filas = cierresFiltrados.map(cierre => {
+            const fecha = new Date(cierre.fecha_cierre);
+            return [
+                fecha.toLocaleDateString('es-ES'),
+                fecha.toLocaleTimeString('es-ES'),
+                cierre.base_total || 0,
+                (cierre.total_ventas_pasteles || 0) + (cierre.total_ventas_bebidas || 0),
+                cierre.total_nequi || 0,
+                cierre.efectivo_esperado || 0,
+                cierre.efectivo_contado || 0,
+                cierre.diferencia || 0,
+                (cierre.observaciones || '').replace(/,/g, ' ')
+            ];
+        });
+        
+        let csvContent = cabeceras.join(',') + '\n';
+        filas.forEach(fila => {
+            csvContent += fila.join(',') + '\n';
+        });
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.setAttribute('download', `reporte_cierres_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        alert('✅ Reporte exportado exitosamente');
+    }
+
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', function() {
+        actualizarFecha();
+        cargarHistorial();
+        document.getElementById('btnVerMas').addEventListener('click', cargarMasRegistros);
+    });
+
+
+    </script>
+</body>
+</html>

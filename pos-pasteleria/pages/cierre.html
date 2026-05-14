@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cierre de Turno - POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .money-input {
+            font-family: monospace;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .efectivo-esperado {
+            font-size: 2rem;
+            color: #8B4513;
+            font-weight: bold;
+            background: #fff3cd;
+            padding: 10px 20px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+        
+        .diferencia-positiva {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .diferencia-negativa {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .diferencia-cero {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .mensaje-diferencia {
+            margin: 15px 0;
+            padding: 12px;
+            border-radius: 10px;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<nav class="main-nav">
+            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+</nav>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h2>📊 Cierre de turno</h2>
+            <p>Verifique los montos y registre el efectivo final</p>
+            
+            <div class="dashboard">
+                <div class="card">
+                    <h3>Resumen de ventas</h3>
+                    <p>Pasteles: <strong id="resumenPastelesCierre">$0</strong></p>
+                    <p>Bebidas: <strong id="resumenBebidasCierre">$0</strong></p>
+                    <p>Total Efectivo: <strong id="totalEfectivoCierre">$0</strong></p>
+                    <p>Total Nequi: <strong id="totalNequiCierre">$0</strong></p>
+                </div>
+                
+                <div class="card">
+                    <h3>Base Inicial</h3>
+                    <p>Billetes: <strong id="baseBilletesCierre">$0</strong></p>
+                    <p>Monedas: <strong id="baseMonedasCierre">$0</strong></p>
+                    <p>Total Base: <strong id="baseTotalCierre">$0</strong></p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Verificación de Caja</h3>
+                <p><strong>EFECTIVO ESPERADO:</strong></p>
+                <p><strong id="efectivoEsperado" class="efectivo-esperado">$0</strong></p>
+                <p>Base + Ventas en efectivo</p>
+                
+                <div class="form-group">
+                    <label>Dinero Físico Contado ($):</label>
+                    <input type="text" id="efectivoContado" class="money-input" 
+                           placeholder="Ej: 173.500"
+                           oninput="formatearNumero(this)"
+                           onblur="formatearNumeroCompleto(this)">
+                    <small>Ingrese el dinero contado en caja (billetes + monedas)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Observaciones (Opcional):</label>
+                    <textarea id="observacionesCierre" rows="3" placeholder="Justificación de descuadres, novedades del turno..."></textarea>
+                </div>
+                
+                <div id="mensajeDiferencia" class="mensaje-diferencia"></div>
+                
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button onclick="registrarCierre()" class="btn btn-success">✅ Finalizar cierre</button>
+                    <button onclick="window.location.href='ventas.html'" class="btn">⬅️ Volver a ventas</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="../js/database.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        // ==================== FUNCIONES PARA FORMATEAR NÚMEROS ====================
+
+
+       
+
+
+        // Formatear números con puntos (para montos)
+        function formatearNumero(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
+            let numero = parseInt(valor, 10);
+            input.value = numero.toLocaleString('es-ES');
+        }
+        
+        function formatearNumeroCompleto(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
+            let numero = parseInt(valor, 10);
+            input.value = numero.toLocaleString('es-ES');
+        }
+        
+        // Obtener valor numérico real (sin puntos)
+        function obtenerValorNumerico(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return 0;
+            let valor = input.value.replace(/[^0-9]/g, '');
+            return valor === '' ? 0 : parseInt(valor, 10);
+        }
+        
+        // Formatear número para mostrar (con puntos)
+        function formatearMostrar(numero) {
+            if (numero === undefined || numero === null) return '0';
+            return numero.toLocaleString('es-ES');
+        }
+        
+        // ==================== FUNCIONES DE CIERRE ====================
+        
+        // Variable global para almacenar datos del cierre
+        let datosCierreActual = {
+            totalPasteles: 0,
+            totalBebidas: 0,
+            totalEfectivo: 0,
+            totalNequi: 0,
+            baseBilletes: 0,
+            baseMonedas: 0,
+            baseTotal: 0,
+            efectivoEsperado: 0,
+            aperturaId: null
+        };
+        
+        function cargarDatosCierre() {
+            const apertura = getAperturaActual();
+            
+            if (!apertura) {
+                mostrarMensaje('❌ No hay un turno abierto para cerrar', 'error');
+                document.getElementById('efectivoContado').disabled = true;
+                return;
+            }
+            
+            // Obtener resumen de ventas
+            const resumen = getResumenVentas(apertura.id);
+            
+            // Guardar datos
+            datosCierreActual = {
+                totalPasteles: resumen.totalPasteles,
+                totalBebidas: resumen.totalBebidas,
+                totalEfectivo: resumen.totalEfectivo,
+                totalNequi: resumen.totalNequi,
+                baseBilletes: apertura.base_billetes,
+                baseMonedas: apertura.base_monedas,
+                baseTotal: apertura.base_total,
+                efectivoEsperado: apertura.base_total + resumen.totalEfectivo,
+                aperturaId: apertura.id
+            };
+            
+            // Mostrar en la interfaz (con formato de puntos)
+            document.getElementById('resumenPastelesCierre').textContent = `$${formatearMostrar(datosCierreActual.totalPasteles)}`;
+            document.getElementById('resumenBebidasCierre').textContent = `$${formatearMostrar(datosCierreActual.totalBebidas)}`;
+            document.getElementById('totalEfectivoCierre').textContent = `$${formatearMostrar(datosCierreActual.totalEfectivo)}`;
+            document.getElementById('totalNequiCierre').textContent = `$${formatearMostrar(datosCierreActual.totalNequi)}`;
+            document.getElementById('baseBilletesCierre').textContent = `$${formatearMostrar(datosCierreActual.baseBilletes)}`;
+            document.getElementById('baseMonedasCierre').textContent = `$${formatearMostrar(datosCierreActual.baseMonedas)}`;
+            document.getElementById('baseTotalCierre').textContent = `$${formatearMostrar(datosCierreActual.baseTotal)}`;
+            document.getElementById('efectivoEsperado').textContent = `$${formatearMostrar(datosCierreActual.efectivoEsperado)}`;
+        }
+        
+        // Calcular diferencia en tiempo real
+        function calcularDiferencia() {
+            const efectivoContado = obtenerValorNumerico('efectivoContado');
+            const efectivoEsperado = datosCierreActual.efectivoEsperado;
+            const diferencia = efectivoContado - efectivoEsperado;
+            
+            const mensajeDiv = document.getElementById('mensajeDiferencia');
+            
+            if (efectivoContado > 0) {
+                if (diferencia === 0) {
+                    mensajeDiv.style.display = 'block';
+                    mensajeDiv.style.background = '#d4edda';
+                    mensajeDiv.style.color = '#155724';
+                    mensajeDiv.innerHTML = `
+                        <strong>✅ ¡PERFECTO!</strong><br>
+                        La caja está exactamente cuadrada.<br>
+                        Efectivo esperado: $${formatearMostrar(efectivoEsperado)}<br>
+                        Efectivo contado: $${formatearMostrar(efectivoContado)}<br>
+                        <span class="diferencia-cero">Diferencia: $0</span>
+                    `;
+                } else if (diferencia > 0) {
+                    mensajeDiv.style.display = 'block';
+                    mensajeDiv.style.background = '#fff3cd';
+                    mensajeDiv.style.color = '#856404';
+                    mensajeDiv.innerHTML = `
+                        <strong>⚠️ ¡ATENCIÓN! SOBRANTE EN CAJA</strong><br>
+                        Hay un sobrante de <span class="diferencia-positiva">$${formatearMostrar(diferencia)}</span><br>
+                        Efectivo esperado: $${formatearMostrar(efectivoEsperado)}<br>
+                        Efectivo contado: $${formatearMostrar(efectivoContado)}<br>
+                        <small>Verifica si hay dinero extra o un error en el conteo.</small>
+                    `;
+                } else {
+                    mensajeDiv.style.display = 'block';
+                    mensajeDiv.style.background = '#f8d7da';
+                    mensajeDiv.style.color = '#721c24';
+                    mensajeDiv.innerHTML = `
+                        <strong>⚠️ ¡ATENCIÓN! FALTANTE EN CAJA</strong><br>
+                        Hay un faltante de <span class="diferencia-negativa">$${formatearMostrar(Math.abs(diferencia))}</span><br>
+                        Efectivo esperado: $${formatearMostrar(efectivoEsperado)}<br>
+                        Efectivo contado: $${formatearMostrar(efectivoContado)}<br>
+                        <small>Verifica si hay dinero faltante o un error en el conteo.</small>
+                    `;
+                }
+            } else {
+                mensajeDiv.style.display = 'none';
+            }
+        }
+
+
+          // ==================== FUNCIONES DE MENSAJES ====================
+    function mostrarMensaje(mensaje, tipo) {
+    const mensajeDiv = document.getElementById('mensajeDiferencia');
+    if (mensajeDiv) {
+        mensajeDiv.style.display = 'block';
+        if (tipo === 'error') {
+            mensajeDiv.style.background = '#f8d7da';
+            mensajeDiv.style.color = '#721c24';
+        } else if (tipo === 'warning') {
+            mensajeDiv.style.background = '#fff3cd';
+            mensajeDiv.style.color = '#856404';
+        } else {
+            mensajeDiv.style.background = '#d4edda';
+            mensajeDiv.style.color = '#155724';
+        }
+        mensajeDiv.innerHTML = `<strong>${tipo === 'error' ? '❌ ERROR' : tipo === 'warning' ? '⚠️ ATENCIÓN' : 'ℹ️ INFO'}</strong><br>${mensaje}`;
+        setTimeout(() => {
+            if (mensajeDiv.style.display !== 'none') mensajeDiv.style.display = 'none';
+        }, 4000);
+    } else {
+        alert(mensaje);
+    }
+}
+
+function mostrarMensajeError(mensaje) {
+    mostrarMensaje(mensaje, 'error');
+}
+
+
+
+        
+        function registrarCierre() {
+            // Verificar que hay un turno abierto
+            const apertura = getAperturaActual();
+            if (!apertura) {
+                mostrarMensajeError('❌ No hay un turno abierto para cerrar');
+                return;
+            }
+
+           
+            
+            // Obtener efectivo contado (sin puntos)
+            const efectivoContado = obtenerValorNumerico('efectivoContado');
+            
+            if (efectivoContado === 0) {
+                mostrarMensajeError('❌ Ingresa el dinero contado en caja');
+                return;
+            }
+            
+            const observaciones = document.getElementById('observacionesCierre').value;
+            const efectivoEsperado = datosCierreActual.efectivoEsperado;
+            const diferencia = efectivoContado - efectivoEsperado;
+            
+        
+
+        
+
+
+            // Mostrar resumen final con formato
+            let mensajeResumen = `
+╔═══════════════════════════════════════════╗
+║           RESUMEN DE CIERRE               ║
+╠═══════════════════════════════════════════╣
+║ 💰 Ventas efectivo: $${formatearMostrar(datosCierreActual.totalEfectivo)}
+║ 📱 Transferencias Nequi: $${formatearMostrar(datosCierreActual.totalNequi)}
+║ 💵 Base inicial: $${formatearMostrar(datosCierreActual.baseTotal)}
+╠═══════════════════════════════════════════╣
+║ 📊 Efectivo esperado: $${formatearMostrar(efectivoEsperado)}
+║ 💵 Efectivo contado: $${formatearMostrar(efectivoContado)}
+╠═══════════════════════════════════════════╣
+`;
+            
+            if (diferencia === 0) {
+                mensajeResumen += `║ ✅ Diferencia: $0 (CUADRADA)          ║\n`;
+            } else if (diferencia > 0) {
+                mensajeResumen += `║ ⚠️ SOBRANTE: $${formatearMostrar(diferencia)}              ║\n`;
+            } else {
+                mensajeResumen += `║ ⚠️ FALTANTE: $${formatearMostrar(Math.abs(diferencia))}               ║\n`;
+            }
+            mensajeResumen += `╚═══════════════════════════════════════════╝`;
+            
+            // Confirmar cierre
+            const confirmar = confirm(mensajeResumen + '\n\n¿Confirmar y finalizar el turno?');
+            if (!confirmar) return;
+            
+            // Crear registro de cierre
+            const cierre = {
+                apertura_id: apertura.id,
+                total_ventas_pasteles: datosCierreActual.totalPasteles,
+                total_ventas_bebidas: datosCierreActual.totalBebidas,
+                total_nequi: datosCierreActual.totalNequi,
+                efectivo_esperado: efectivoEsperado,
+                efectivo_contado: efectivoContado,
+                diferencia: diferencia,
+                observaciones: observaciones || 'Sin observaciones',
+                fecha_cierre: new Date().toISOString()
+            };
+            
+            // Guardar cierre
+            DB.add('cierres_caja', cierre);
+            
+            // Cerrar la apertura
+            DB.update('aperturas_caja', apertura.id, { estado: 'cerrada' });
+            
+            // Mensaje de éxito
+            if (diferencia === 0) {
+                alert('✅ ¡CIERRE EXITOSO! La caja está perfectamente cuadrada. Redirigiendo al inicio...');
+            } else if (diferencia > 0) {
+                alert(`⚠️ Cierre completado con SOBRANTE de $${formatearMostrar(diferencia)}. Redirigiendo al inicio...`);
+            } else {
+                alert(`⚠️ Cierre completado con FALTANTE de $${formatearMostrar(Math.abs(diferencia))}. Redirigiendo al inicio...`);
+            }
+            
+            // Redirigir al inicio después de 2 segundos
+            setTimeout(() => {
+                window.location.href = '../index.html';
+            }, 2000);
+        }
+        
+        // Función para mostrar mensajes de error
+        function mostrarMensajeError(mensaje) {
+            const mensajeDiv = document.getElementById('mensajeDiferencia');
+            if (mensajeDiv) {
+                mensajeDiv.style.display = 'block';
+                mensajeDiv.style.background = '#f8d7da';
+                mensajeDiv.style.color = '#721c24';
+                mensajeDiv.innerHTML = `<strong>❌ ERROR</strong><br>${mensaje}`;
+                
+                setTimeout(() => {
+                    if (mensajeDiv.style.display !== 'none') {
+                        mensajeDiv.style.display = 'none';
+                    }
+                }, 4000);
+            } else {
+                alert(mensaje);
+            }
+        }
+        
+
+        
+
+        function registrarVenta(producto, cantidad) {
+    const aperturaActual = getAperturaActual();
+    if (!aperturaActual) {
+        alert('Debes abrir un turno primero');
+        return;
+    }
+    
+    const venta = {
+        id: Date.now(),
+        producto_id: producto.id,
+        nombre: producto.nombre,
+        categoria: producto.categoria,
+        cantidad: cantidad,
+        precio_unitario: producto.precio,
+        total: producto.precio * cantidad,
+        fecha: new Date().toISOString(),
+        hora: new Date().toLocaleTimeString()
+    };
+    
+    // Guardar en el detalle del turno actual
+    const key = `ventas_turno_${aperturaActual.id}`;
+    const ventasExistentes = sessionStorage.getItem(key) || '[]';
+    const ventas = JSON.parse(ventasExistentes);
+    ventas.push(venta);
+    sessionStorage.setItem(key, JSON.stringify(ventas));
+    
+    // Resto de tu código para actualizar UI...
+}
+
+
+
+        // Configurar evento para calcular diferencia en tiempo real
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarDatosCierre();
+            
+            const efectivoContado = document.getElementById('efectivoContado');
+            if (efectivoContado) {
+                efectivoContado.addEventListener('input', function() {
+                    if (datosCierreActual.efectivoEsperado > 0) {
+                        calcularDiferencia();
+                    }
+                });
+                
+                efectivoContado.addEventListener('blur', function() {
+                    if (this.value === '') {
+                        this.value = '';
+                    }
+                });
+            }
+        });
+        
+        // Hacer funciones globales
+        window.registrarCierre = registrarCierre;
+        window.formatearNumero = formatearNumero;
+        window.formatearNumeroCompleto = formatearNumeroCompleto;
+        window.cargarDatosCierre = cargarDatosCierre;
+    </script>
+</body>
+</html>

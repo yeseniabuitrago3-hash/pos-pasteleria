@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Análisis Pastelero | POS Pastelería</title>
+    <!-- Google Fonts & Chart.js -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f1e6e6;
+            font-family: 'Inter', sans-serif;
+            color: #2D2A24;
+            padding: 24px 28px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* ========== HEADER & NAV ========== */
+        .header {
+            background: #054480; 
+            border-radius: 32px;
+            padding: 16px 28px;
+            margin-bottom: 28px;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255, 215, 190, 0.5);
+        }
+
+        .logo h1 {
+            font-size: 1.7rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #f3eded, #ffffff);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+
+        .fecha {
+            font-size: 0.8rem;
+            color: #7F6B5E;
+            background: #ffffff;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-weight: 500;
+        }
+
+        .turno-info {
+            background: #d1d4d4;
+            padding: 8px 20px;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            box-shadow: inset 0 1px 2px #fff8, 0 2px 5px rgba(0,0,0,0.02);
+        }
+
+        .estado-abierto { color: #2C7A3B; }
+        .estado-cerrado { color: #B84C2C; }
+
+        /* Navegación principal */
+        .main-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            background: #ffffff;
+            padding: 12px 24px;
+            border-radius: 60px;
+            margin-bottom: 30px;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.03);
+            border: 1px solid #FFE2D0;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            padding: 10px 22px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            color: #5A4A3A;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .nav-btn:hover {
+            background: #FFF0E4;
+            color: #b1b1b1;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-active {
+            background: #2867f0;
+            color: white;
+            box-shadow: 0 6px 14px rgba(240, 90, 40, 0.3);
+        }
+
+        /* ========== TARJETAS DE FILTRO ========== */
+        .filtros-card {
+            background: #FFFFFF;
+            border-radius: 32px;
+            padding: 24px 28px;
+            margin-bottom: 32px;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(233, 124, 46, 0.15);
+        }
+
+        .filtros-grid {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .filtros-group {
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .filtros-group label {
+            display: block;
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #2843dac4;
+            margin-bottom: 8px;
+        }
+
+        .filtros-group select, .filtros-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #FEFAF6;
+            border: 1.5px solid #FFDDC4;
+            border-radius: 24px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-family: 'Inter', monospace;
+        }
+
+        .filtros-group select:focus, .filtros-group input:focus {
+            outline: none;
+            border-color: #F05A28;
+            box-shadow: 0 0 0 3px rgba(240, 90, 40, 0.2);
+            background: white;
+        }
+
+        .btn-primary {
+            background: linear-gradient(105deg, #2846f0, #2277e6);
+            border: none;
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 700;
+            color: white;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 8px rgba(224, 86, 34, 0.3);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.02) translateY(-2px);
+            box-shadow: 0 12px 22px rgba(224, 86, 34, 0.35);
+            background: linear-gradient(105deg, #1d2be4, #1a52bb);
+        }
+
+        /* ========== TARJETAS ESTADÍSTICAS ========== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 1024px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            body { padding: 16px; }
+        }
+
+        .stat-card {
+            background: #FFFFFF;
+            border-radius: 36px;
+            padding: 22px 18px;
+            text-align: center;
+            transition: all 0.35s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            box-shadow: 0 18px 30px -12px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(245, 165, 127, 0.35);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(90deg, #287ff0, #cdf76a);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 28px 40px -14px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-icon {
+            font-size: 2.6rem;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            color: #B97F5E;
+            margin-top: 8px;
+        }
+
+        .stat-value {
+            font-size: 2.3rem;
+            font-weight: 800;
+            color: #3D2B1F;
+            line-height: 1.1;
+            margin: 8px 0 4px;
+        }
+
+        .stat-sub {
+            font-size: 0.7rem;
+            color: #A28C7A;
+            font-weight: 500;
+        }
+
+        /* ========== GRID DE GRÁFICOS - 2 COLUMNAS ========== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 28px;
+            margin-bottom: 32px;
+        }
+
+        .chart-card, .top-products-container {
+            background: #FFFFFF;
+            border-radius: 32px;
+            padding: 20px 24px;
+            box-shadow: 0 18px 30px -12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(245, 169, 127, 0.25);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: fit-content;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-card:hover, .top-products-container:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 22px 35px -14px rgba(0, 0, 0, 0.12);
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #C4451C;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 3px dashed #FFD9C4;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .chart-title span {
+            font-size: 1.4rem;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            min-height: 280px;
+            flex-shrink: 0;
+        }
+
+        canvas {
+            max-height: 280px;
+            width: 100% !important;
+            height: 280px !important;
+        }
+
+        .top-products-container {
+            padding: 20px 24px;
+        }
+
+        .top-products-list {
+            max-height: 280px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .top-products-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .top-products-list::-webkit-scrollbar-track {
+            background: #FEF3E8;
+            border-radius: 10px;
+        }
+
+        .top-products-list::-webkit-scrollbar-thumb {
+            background: #E67E22;
+            border-radius: 10px;
+        }
+
+        .top-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 12px;
+            border-radius: 20px;
+            margin-bottom: 6px;
+            background: #FEFAF6;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .top-item:hover {
+            background: #FFF3EA;
+            border-color: #FFCEB0;
+        }
+
+        .top-rank {
+            width: 40px;
+            height: 40px;
+            background: #FCE5D4;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #D35400;
+        }
+
+        .rank-1 { background: linear-gradient(145deg, #FFD966, #FFB347); color: #482C1A; }
+        .rank-2 { background: linear-gradient(145deg, #E0E0E0, #C0C0C0); color: #2C2C2C; }
+        .rank-3 { background: linear-gradient(145deg, #CB7E4A, #A6552A); color: white; }
+
+        .top-info h4 {
+            font-weight: 800;
+            font-size: 0.9rem;
+            margin-bottom: 2px;
+        }
+
+        .top-info p {
+            font-size: 0.7rem;
+            color: #B97F5E;
+        }
+
+        .top-cantidad {
+            font-weight: 800;
+            color: #E67E22;
+            font-size: 0.9rem;
+        }
+
+        .top-total {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #2C7A47;
+        }
+
+        .resumen-card {
+            background: linear-gradient(125deg, #FFE3D4, #FFD3BC);
+            border-radius: 44px;
+            padding: 28px 36px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+            color: #482816;
+            box-shadow: 0 20px 30px -12px rgba(160, 70, 20, 0.2);
+            margin-top: 8px;
+        }
+
+        .resumen-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .resumen-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        .resumen-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-top: 6px;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px 20px;
+            color: #BB8B6B;
+            font-weight: 500;
+        }
+
+        .info-badge {
+            background: #FFF0E4;
+            padding: 8px 20px;
+            border-radius: 60px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #C25D2E;
+            text-align: center;
+            margin-bottom: 28px;
+            display: inline-block;
+            width: auto;
+        }
+
+        .badge-wrapper {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+            
+            .chart-container {
+                min-height: 260px;
+            }
+            
+            canvas {
+                height: 260px !important;
+            }
+            
+            .top-products-list {
+                max-height: 260px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-nav { border-radius: 32px; justify-content: center; }
+            .chart-card, .top-products-container { padding: 16px 20px; }
+            .resumen-value { font-size: 1.2rem; }
+            .chart-title { font-size: 1rem; }
+            canvas { height: 220px !important; }
+            .chart-container { min-height: 220px; }
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            .resumen-card { padding: 20px; }
+            .resumen-item { min-width: 100px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo">
+            <h1> POS Pastelería · Análisis</h1>
+            <span class="fecha" id="fechaActual"></span>
+        </div>
+        <div class="turno-info">
+            <span id="estadoTurno" class="estado-cerrado">🔴 Turno cerrado</span>
+            <span id="baseInfo" class="base-info"></span>
+        </div>
+    </header>
+
+    <!-- MENÚ PRINCIPAL -->
+    <nav class="main-nav">
+        <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+        <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+        <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+        <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+        <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+        <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+        <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn">📥 Recibir Pedido</button>
+        <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn nav-btn-active">📈 Análisis</button>
+    </nav>
+
+    <!-- FILTROS -->
+    <div class="filtros-card">
+        <div class="filtros-grid">
+            <div class="filtros-group">
+                <label>📅 PERÍODO DE ANÁLISIS</label>
+                <select id="periodoSelect">
+                    <option value="diario">📊 Hoy (Diario)</option>
+                    <option value="semanal" selected>📈 Últimos 7 días (Semanal)</option>
+                    <option value="mensual">📆 Últimos 30 días (Mensual)</option>
+                    <option value="anual">🎯 Año actual (Anual)</option>
+                    <option value="personalizado">⚙️ Personalizado</option>
+                </select>
+            </div>
+            <div id="fechasPersonalizadas" style="display: none; gap: 15px; flex-wrap: wrap;">
+                <div class="filtros-group">
+                    <label>📅 Desde</label>
+                    <input type="date" id="fechaDesdePersonal">
+                </div>
+                <div class="filtros-group">
+                    <label>📅 Hasta</label>
+                    <input type="date" id="fechaHastaPersonal">
+                </div>
+                <button onclick="aplicarFiltroPersonalizado()" class="btn-primary" style="margin-bottom: 0;">Aplicar</button>
+            </div>
+            <button onclick="actualizarDashboard()" class="btn-primary">🔄 ACTUALIZAR</button>
+        </div>
+    </div>
+
+    <!-- TARJETAS ESTADÍSTICAS -->
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Total Ventas</div><div class="stat-value" id="totalVentasStats">$0</div><div class="stat-sub">período actual</div></div>
+        <div class="stat-card"><div class="stat-icon">📱</div><div class="stat-label">Total Nequi</div><div class="stat-value" id="totalNequiStats">$0</div><div class="stat-sub">transferencias</div></div>
+        <div class="stat-card"><div class="stat-icon">🍰</div><div class="stat-label">Pasteles Vendidos</div><div class="stat-value" id="totalPastelesStats">0</div><div class="stat-sub">unidades</div></div>
+        <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">Cierres Realizados</div><div class="stat-value" id="totalCierresStats">0</div><div class="stat-sub">turnos finalizados</div></div>
+    </div>
+
+    <!-- BADGE DE INFORMACIÓN -->
+    <div class="badge-wrapper">
+        <div class="info-badge" id="infoBadge">✨ Datos en tendencia pastelera</div>
+    </div>
+
+    <!-- GRID DE GRÁFICOS - 2 COLUMNAS -->
+    <div class="charts-grid">
+        <!-- Tarjeta 1: Ventas por día -->
+        <div class="chart-card">
+            <div class="chart-title"><span>📊</span> Evolución de ventas en el período</div>
+            <div class="chart-container">
+                <canvas id="chartVentas"></canvas>
+            </div>
+            <div id="sinDatosVentas" class="no-data" style="display: none;">📭 No hay datos de ventas en este rango</div>
+        </div>
+
+        <!-- Tarjeta 2: Top Productos -->
+        <div class="top-products-container">
+            <div class="chart-title"><span>🏆</span> Productos estrella</div>
+            <div class="top-products-list" id="topProductosLista">
+                <div class="no-data">🍰 Cargando productos...</div>
+            </div>
+        </div>
+
+        <!-- Tarjeta 3: Tendencia mensual (línea) -->
+        <div class="chart-card">
+            <div class="chart-title"><span>📈</span> Comportamiento mensual (tendencia)</div>
+            <div class="chart-container">
+                <canvas id="chartTendencia"></canvas>
+            </div>
+        </div>
+
+        <!-- Tarjeta 4: Comparativa mensual (barras) -->
+        <div class="chart-card">
+            <div class="chart-title"><span>📆</span> Comparativa mensual (año actual)</div>
+            <div class="chart-container">
+                <canvas id="chartComparativa"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESUMEN ADICIONAL -->
+    <div class="resumen-card">
+        <div class="resumen-item"><div class="resumen-label">📊 Promedio por día</div><div class="resumen-value" id="promedioDiario">$0</div></div>
+        <div class="resumen-item"><div class="resumen-label">🏆 Mejor día (ventas)</div><div class="resumen-value" id="mejorDia">-</div></div>
+        <div class="resumen-item"><div class="resumen-label">🔄 Transacciones</div><div class="resumen-value" id="totalTransacciones">0</div></div>
+    </div>
+</div>
+
+<script src="../js/database.js"></script>
+<script>
+    let chartVentas, chartTendencia, chartComparativa;
+
+    // ========== ACTUALIZACIÓN DE FECHA Y ESTADO DE TURNO ==========
+    function actualizarFecha() {
+        const hoy = new Date();
+        const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const fechaSpan = document.getElementById('fechaActual');
+        if (fechaSpan) fechaSpan.textContent = hoy.toLocaleDateString('es-ES', opciones);
+    }
+
+    function actualizarEstadoTurno() {
+        if (typeof getAperturaActual === 'function') {
+            const apertura = getAperturaActual();
+            const estadoSpan = document.getElementById('estadoTurno');
+            const baseSpan = document.getElementById('baseInfo');
+            if (apertura) {
+                estadoSpan.className = 'estado-abierto';
+                estadoSpan.innerHTML = '🟢 Turno abierto';
+                if(baseSpan) baseSpan.innerHTML = `Base: $${apertura.base_total?.toLocaleString('es-ES') || '0'}`;
+            } else {
+                estadoSpan.className = 'estado-cerrado';
+                estadoSpan.innerHTML = '🔴 Turno cerrado';
+                if(baseSpan) baseSpan.innerHTML = '';
+            }
+        }
+    }
+
+    // ========== FORMATEAR FECHA EN ESPAÑOL ==========
+    function formatearFechaEnEspanol(fechaString) {
+        if (!fechaString) return '-';
+        try {
+            const fecha = new Date(fechaString);
+            const opciones = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            };
+            return fecha.toLocaleDateString('es-ES', opciones);
+        } catch (error) {
+            console.error('Error formateando fecha:', error);
+            return fechaString;
+        }
+    }
+
+    // ========== OBTENER FECHAS SEGÚN PERÍODO ==========
+    function obtenerFechasPeriodo() {
+        const hoy = new Date();
+        let fechaInicio, fechaFin;
+        const periodo = document.getElementById('periodoSelect').value;
+        
+        switch(periodo) {
+            case 'diario':
+                fechaInicio = new Date(hoy); fechaInicio.setHours(0,0,0,0);
+                fechaFin = new Date(hoy); fechaFin.setHours(23,59,59,999);
+                break;
+            case 'semanal':
+                fechaInicio = new Date(hoy); fechaInicio.setDate(hoy.getDate()-7); fechaInicio.setHours(0,0,0,0);
+                fechaFin = new Date(hoy); fechaFin.setHours(23,59,59,999);
+                break;
+            case 'mensual':
+                fechaInicio = new Date(hoy); fechaInicio.setDate(hoy.getDate()-30); fechaInicio.setHours(0,0,0,0);
+                fechaFin = new Date(hoy); fechaFin.setHours(23,59,59,999);
+                break;
+            case 'anual':
+                fechaInicio = new Date(hoy.getFullYear(),0,1);
+                fechaFin = new Date(hoy.getFullYear(),11,31,23,59,59);
+                break;
+            case 'personalizado':
+                const desde = document.getElementById('fechaDesdePersonal').value;
+                const hasta = document.getElementById('fechaHastaPersonal').value;
+                if(desde && hasta) {
+                    fechaInicio = new Date(desde); fechaInicio.setHours(0,0,0,0);
+                    fechaFin = new Date(hasta); fechaFin.setHours(23,59,59,999);
+                } else {
+                    fechaInicio = new Date(hoy); fechaInicio.setDate(hoy.getDate()-7);
+                    fechaFin = new Date(hoy);
+                }
+                break;
+            default:
+                fechaInicio = new Date(hoy); fechaInicio.setDate(hoy.getDate()-7);
+                fechaFin = new Date(hoy);
+        }
+        return { fechaInicio, fechaFin };
+    }
+
+    // ========== FUNCIÓN PRINCIPAL: ACTUALIZAR DASHBOARD ==========
+    async function actualizarDashboard() {
+        if (typeof DB === 'undefined') {
+            console.error('Database.js no cargado');
+            return;
+        }
+
+        const { fechaInicio, fechaFin } = obtenerFechasPeriodo();
+
+        if (typeof getEstadisticasPeriodo !== 'function') {
+            console.error('Funciones de análisis no encontradas en database.js');
+            return;
+        }
+
+        // 1. Estadísticas principales
+        const stats = getEstadisticasPeriodo(fechaInicio, fechaFin);
+        
+        // Actualizar tarjetas numéricas
+        document.getElementById('totalVentasStats').innerHTML = `$${stats.totalVentas.toLocaleString('es-ES')}`;
+        document.getElementById('totalNequiStats').innerHTML = `$${stats.totalNequi.toLocaleString('es-ES')}`;
+        document.getElementById('totalPastelesStats').innerHTML = stats.totalPasteles;
+        document.getElementById('totalCierresStats').innerHTML = stats.totalCierres;
+        document.getElementById('promedioDiario').innerHTML = `$${Math.round(stats.promedioDiario).toLocaleString('es-ES')}`;
+        
+        // ✅ CORRECCIÓN: Formatear la fecha del mejor día en español
+        const mejorDiaFormateado = stats.mejorDia.fecha ? 
+            `${formatearFechaEnEspanol(stats.mejorDia.fecha)} ($${stats.mejorDia.total.toLocaleString('es-ES')})` : '-';
+        document.getElementById('mejorDia').innerHTML = mejorDiaFormateado;
+        
+        document.getElementById('totalTransacciones').innerHTML = stats.totalCierres;
+
+        // 2. Top productos
+        const topProductos = getTopProductos(fechaInicio, fechaFin);
+        const containerTop = document.getElementById('topProductosLista');
+        if (topProductos.length === 0) {
+            containerTop.innerHTML = '<div class="no-data">🍰 No hay productos vendidos en este período</div>';
+        } else {
+            let html = '';
+            topProductos.slice(0, 10).forEach((item, idx) => {
+                const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
+                html += `
+                    <div class="top-item">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div class="top-rank ${rankClass}">${idx + 1}</div>
+                            <div class="top-info">
+                                <h4>${escapeHtml(item.nombre)}</h4>
+                                <p>${escapeHtml(item.categoria || 'Producto')}</p>
+                            </div>
+                        </div>
+                        <div class="top-stats">
+                            <div class="top-cantidad">${item.cantidad} ud</div>
+                            <div class="top-total">$${item.total.toLocaleString('es-ES')}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            containerTop.innerHTML = html;
+        }
+
+        // 3. Gráfico de ventas por día
+        const ventasPorDia = getVentasAgrupadasPorDia(fechaInicio, fechaFin);
+        const labelsDia = Array.from(ventasPorDia.keys()).sort((a,b) => new Date(a) - new Date(b));
+        const dataDia = labelsDia.map(l => ventasPorDia.get(l));
+        
+        if (chartVentas) chartVentas.destroy();
+        const ctxVentas = document.getElementById('chartVentas').getContext('2d');
+        chartVentas = new Chart(ctxVentas, {
+            type: 'bar',
+            data: { 
+                labels: labelsDia, 
+                datasets: [{ 
+                    label: 'Ventas del día', 
+                    data: dataDia, 
+                    backgroundColor: '#E67E22',
+                    borderRadius: 10
+                }] 
+            },
+            options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    tooltip: { callbacks: { label: (ctx) => `$${ctx.raw.toLocaleString('es-ES')}` } },
+                    legend: { position: 'top', labels: { font: { size: 11 } } }
+                }
+            }
+        });
+
+        // 4. Gráfico de tendencia mensual
+        const { labels: labelsTend, data: dataTend } = getTendenciaMensual();
+        if (chartTendencia) chartTendencia.destroy();
+        const ctxLine = document.getElementById('chartTendencia').getContext('2d');
+        chartTendencia = new Chart(ctxLine, {
+            type: 'line', 
+            data: { 
+                labels: labelsTend, 
+                datasets: [{ 
+                    label: 'Ventas mensuales', 
+                    data: dataTend, 
+                    borderColor: '#E67E22', 
+                    backgroundColor: 'rgba(230,126,34,0.05)', 
+                    fill: true, 
+                    tension: 0.4, 
+                    borderWidth: 3
+                }] 
+            },
+            options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    tooltip: { callbacks: { label: (ctx)=>`$${ctx.raw.toLocaleString('es-ES')}` } },
+                    legend: { position: 'top', labels: { font: { size: 11 } } }
+                }
+            }
+        });
+
+        // 5. Gráfico comparativa mensual (año actual)
+        const ventasMensual = getComparativaMensualAnioActual();
+        const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        if (chartComparativa) chartComparativa.destroy();
+        const ctxComp = document.getElementById('chartComparativa').getContext('2d');
+        chartComparativa = new Chart(ctxComp, {
+            type: 'bar', 
+            data: { 
+                labels: mesesNombres, 
+                datasets: [{ 
+                    label: 'Ingresos mensuales', 
+                    data: ventasMensual, 
+                    backgroundColor: '#F7B26A', 
+                    borderRadius: 14
+                }] 
+            },
+            options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    tooltip: { callbacks: { label: (ctx)=>`$${ctx.raw.toLocaleString('es-ES')}` } },
+                    legend: { position: 'top', labels: { font: { size: 11 } } }
+                }
+            }
+        });
+
+        // Actualizar badge con la hora actual
+        const ahora = new Date();
+        document.getElementById('infoBadge').innerHTML = `🍰 Actualizado ${ahora.toLocaleTimeString('es-ES')}`;
+    }
+
+    // Función auxiliar para escapar HTML y prevenir XSS
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ========== MANEJADORES ==========
+    function cambiarPeriodo() {
+        const val = document.getElementById('periodoSelect').value;
+        const divFechas = document.getElementById('fechasPersonalizadas');
+        divFechas.style.display = val === 'personalizado' ? 'flex' : 'none';
+        actualizarDashboard();
+    }
+
+    function aplicarFiltroPersonalizado() {
+        actualizarDashboard();
+    }
+
+    // ========== INICIALIZACIÓN ==========
+    document.addEventListener('DOMContentLoaded', () => {
+        actualizarFecha();
+        actualizarEstadoTurno();
+        
+        const periodoSelect = document.getElementById('periodoSelect');
+        if (periodoSelect) {
+            periodoSelect.addEventListener('change', cambiarPeriodo);
+        }
+        
+        // Cargar dashboard inicial
+        actualizarDashboard();
+        
+        // Actualizar automáticamente cada 30 segundos
+        setInterval(() => { 
+            actualizarEstadoTurno(); 
+            actualizarDashboard(); 
+        }, 30000);
+    });
+</script>
+</body>
+</html>

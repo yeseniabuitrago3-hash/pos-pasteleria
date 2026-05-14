@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario - POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📦 Gestión de Inventario</h1>
+            <button onclick="abrirModalAgregarProducto()" class="btn btn-primary">➕ Nuevo Producto</button>
+        </div>
+        <nav class="main-nav">
+            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+</nav>
+        
+        <div id="alertContainer"></div>
+        
+        <div class="card">
+            <h3>Productos en stock</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Precio</th>
+                            <th>Stock</th>
+                            <th>Mínimo</th>
+                            <th>Categoría</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaInventario">
+                        <tr><td colspan="7">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>⚠️ Alertas de stock bajo</h3>
+            <div id="alertasStock"></div>
+        </div>
+        
+        <div style="margin-top:20px;">
+            <button onclick="window.location.href='../index.html'" class="btn">⬅️ Volver</button>
+        </div>
+    </div>
+    
+    <script src="../js/database.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        cargarInventario();
+        
+        function actualizarAlertas() {
+            const productos = DB.get('productos');
+            const criticos = productos.filter(p => p.stock_actual <= p.stock_minimo);
+            const container = document.getElementById('alertasStock');
+            
+            if (criticos.length === 0) {
+                container.innerHTML = '<p>✅ No hay productos con stock crítico</p>';
+            } else {
+                let html = '';
+                criticos.forEach(p => {
+                    html += `<div class="alert-warning" style="padding:10px; margin:5px 0; border-radius:8px;">
+                        ⚠️ <strong>${p.nombre}</strong>: stock ${p.stock_actual} (mínimo ${p.stock_minimo})
+                        <button onclick="recibirPedido(${p.id})" style="float:right; background:#27ae60; border:none; color:white; padding:5px 10px; border-radius:5px;">📦 Recibir pedido</button>
+                    </div>`;
+                });
+                container.innerHTML = html;
+            }
+        }
+        
+        actualizarAlertas();
+        
+        window.recibirPedido = recibirPedido;
+    </script>
+</body>
+</html>

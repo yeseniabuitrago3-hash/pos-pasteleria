@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recibir Pedido - POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .factura-session {
+            background: linear-gradient(135deg, #27ae60, #219a52);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .producto-agregado {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            animation: fadeIn 0.3s ease;
+        }
+        .producto-agregado:hover {
+            background: #f5f5f5;
+        }
+        .cantidad-badge {
+            background: #8B4513;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            z-index: 9999;
+            animation: slideIn 0.3s ease;
+        }
+        .toast-success { background: #27ae60; }
+        .toast-error { background: #e74c3c; }
+        .toast-warning { background: #f39c12; }
+        .toast-info { background: #3498db; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .money-input {
+            font-family: monospace;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header con navegación -->
+        <header class="header">
+            <div class="logo">
+                <h1>🧁 POS Pastelería</h1>
+                <span class="fecha" id="fechaActual"></span>
+            </div>
+            <div class="turno-info">
+                <span id="estadoTurno" class="estado-cerrado">🔴 Turno cerrado</span>
+                <span id="baseInfo" class="base-info"></span>
+            </div>
+        </header>
+
+
+        <nav class="main-nav">
+            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+</nav>
+        </nav>
+
+        <!-- Sesión de factura actual -->
+        <div class="factura-session" id="facturaSession">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong>📄 FACTURA ACTUAL</strong><br>
+                    Número: <span id="facturaNumero">No iniciada</span>
+                </div>
+                <div>
+                    Proveedor: <span id="facturaProveedor">-</span>
+                </div>
+                <button onclick="iniciarNuevaFactura()" class="btn btn-success" style="background: white; color: #27ae60; border: none;">
+                    ➕ Nueva Factura
+                </button>
+            </div>
+        </div>
+
+        <!-- Área de escaneo rápido -->
+        <div class="card" id="areaEscaneo">
+            <h3>🔍 Escanear Productos</h3>
+            <div class="form-group">
+                <label>Código de barras del producto:</label>
+                <input type="text" id="scannerInput" class="scanner-input" 
+                       placeholder="Escanea el código del producto que llegó" autofocus>
+                <small>💡 Escanea cada producto de la factura. El sistema te pedirá la cantidad.</small>
+            </div>
+            
+            <div id="ultimoEscaneado" style="display: none; margin-top: 15px;" class="alert-info toast">
+                <strong>Último escaneado:</strong> <span id="ultimoProducto"></span>
+            </div>
+        </div>
+
+        <!-- Lista de productos agregados -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <h3>📋 Productos de esta factura</h3>
+                <div>
+                    <strong id="totalProductosFactura">0</strong> productos
+                    <button onclick="finalizarFactura()" class="btn btn-success" style="margin-left: 10px;">
+                        ✅ Finalizar Factura
+                    </button>
+                    <button onclick="cancelarFactura()" class="btn btn-outline">
+                        ❌ Cancelar
+                    </button>
+                </div>
+            </div>
+            <div id="listaProductosFactura" style="max-height: 400px; overflow-y: auto;">
+                <p style="text-align: center; color: gray;">No hay productos agregados. Escanea productos para comenzar.</p>
+            </div>
+        </div>
+
+        <!-- Resumen de stock -->
+        <div class="card">
+            <h3>📊 Resumen de Stock Actualizado</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Producto</th><th>Stock Actual</th><th>Stock Mínimo</th><th>Estado</th></tr>
+                    </thead>
+                    <tbody id="resumenStock">
+                        <tr><td colspan="4">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button onclick="window.location.href='inventario.html'" class="btn">⬅️ Volver a Inventario</button>
+        </div>
+    </div>
+
+    <!-- Modal para cantidad -->
+    <div id="modalCantidad" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📦 ¿Cuántas unidades llegaron?</h2>
+                <span class="close-modal" onclick="cerrarModalCantidad()">&times;</span>
+            </div>
+            <div id="infoProductoModal" style="margin-bottom: 20px;"></div>
+            <div class="form-group">
+                <label>Cantidad recibida:</label>
+                <input type="number" id="cantidadRecibida" placeholder="Ej: 24" min="1" autofocus>
+            </div>
+            <div class="form-group">
+                <label>Precio de compra (por unidad):</label>
+                <input type="text" id="precioCompra" class="money-input" placeholder="Ej: 1.800" 
+                       oninput="formatearNumero(this)" onblur="formatearNumeroCompleto(this)">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="confirmarAgregarProducto()" class="btn btn-success">✅ Agregar a factura</button>
+                <button onclick="cerrarModalCantidad()" class="btn btn-outline">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/database.js"></script>
+    <script src="../js/scanner.js"></script>
+    <script>
+        // ==================== FUNCIONES DE FORMATEO ====================
+        function formatearNumero(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            if (valor === '') { input.value = ''; return; }
+            input.value = parseInt(valor, 10).toLocaleString('es-ES');
+        }
+        
+        function formatearNumeroCompleto(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            if (valor === '') { input.value = ''; return; }
+            input.value = parseInt(valor, 10).toLocaleString('es-ES');
+        }
+        
+        function obtenerValorNumerico(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return 0;
+            let valor = input.value.replace(/[^0-9]/g, '');
+            return valor === '' ? 0 : parseInt(valor, 10);
+        }
+        
+        function mostrarToast(mensaje, tipo) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${tipo}`;
+            toast.innerHTML = mensaje;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        // ==================== VARIABLES GLOBALES ====================
+        let facturaActual = { numero: null, proveedor: null, productos: [] };
+        let productoEscaneadoTemporal = null;
+        
+        function actualizarFecha() {
+            const hoy = new Date();
+            document.getElementById('fechaActual').textContent = hoy.toLocaleDateString('es-ES', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+        
+        function actualizarEstadoTurno() {
+            const apertura = getAperturaActual();
+            const estadoSpan = document.getElementById('estadoTurno');
+            const baseSpan = document.getElementById('baseInfo');
+            if (apertura) {
+                estadoSpan.className = 'estado-abierto';
+                estadoSpan.innerHTML = '🟢 Turno abierto';
+                baseSpan.innerHTML = `Base: $${apertura.base_total.toLocaleString('es-ES')}`;
+            } else {
+                estadoSpan.className = 'estado-cerrado';
+                estadoSpan.innerHTML = '🔴 Turno cerrado';
+                baseSpan.innerHTML = '';
+            }
+        }
+        
+        function iniciarNuevaFactura() {
+            const numero = prompt('Número de factura:', `FAC-${new Date().toISOString().slice(0,10)}-001`);
+            if (!numero) return;
+            const proveedor = prompt('Nombre del proveedor:', 'Proveedor');
+            if (!proveedor) return;
+            
+            facturaActual = { numero, proveedor, productos: [], fecha: new Date().toISOString() };
+            document.getElementById('facturaNumero').innerHTML = `<strong>${numero}</strong>`;
+            document.getElementById('facturaProveedor').innerHTML = `<strong>${proveedor}</strong>`;
+            document.getElementById('listaProductosFactura').innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados. Escanea productos para comenzar.</p>';
+            actualizarContadorProductos();
+            mostrarToast(`✅ Factura ${numero} iniciada`, 'success');
+        }
+        
+        function procesarProductoEscaneado(codigo) {
+            if (!facturaActual.numero) {
+                mostrarToast('❌ Primero inicia una factura', 'warning');
+                return;
+            }
+            
+            const productos = DB.find('productos', 'codigo_barras', codigo);
+            if (productos.length === 0) {
+                if (confirm(`Producto ${codigo} no existe.\n¿Desea agregarlo?`)) {
+                    abrirModalAgregarProducto(codigo);
+                }
+                return;
+            }
+            
+            productoEscaneadoTemporal = productos[0];
+            document.getElementById('infoProductoModal').innerHTML = `
+                <p><strong>📦 Producto:</strong> ${productoEscaneadoTemporal.nombre}</p>
+                <p><strong>💰 Precio venta:</strong> $${productoEscaneadoTemporal.precio.toLocaleString('es-ES')}</p>
+                <p><strong>📊 Stock actual:</strong> ${productoEscaneadoTemporal.stock_actual} unidades</p>
+            `;
+            document.getElementById('modalCantidad').style.display = 'flex';
+            document.getElementById('cantidadRecibida').focus();
+        }
+        
+        function confirmarAgregarProducto() {
+            const cantidad = parseInt(document.getElementById('cantidadRecibida').value);
+            const precioCompra = obtenerValorNumerico('precioCompra') || productoEscaneadoTemporal.costo_compra || 0;
+            
+            if (!cantidad || cantidad <= 0) {
+                mostrarToast('❌ Ingresa una cantidad válida', 'error');
+                return;
+            }
+            
+            facturaActual.productos.push({
+                producto_id: productoEscaneadoTemporal.id,
+                nombre: productoEscaneadoTemporal.nombre,
+                codigo: productoEscaneadoTemporal.codigo_barras,
+                cantidad: cantidad,
+                precio_compra: precioCompra,
+                precio_venta: productoEscaneadoTemporal.precio,
+                subtotal: cantidad * precioCompra
+            });
+            
+            registrarMovimientoStock(productoEscaneadoTemporal.id, 'ENTRADA', cantidad, `COMPRA - Factura ${facturaActual.numero}`, 'cajero');
+            actualizarListaFactura();
+            actualizarResumenStock();
+            actualizarContadorProductos();
+            mostrarToast(`✅ ${cantidad} de ${productoEscaneadoTemporal.nombre} agregadas`, 'success');
+            cerrarModalCantidad();
+            document.getElementById('cantidadRecibida').value = '';
+            document.getElementById('precioCompra').value = '';
+        }
+        
+        function cerrarModalCantidad() {
+            document.getElementById('modalCantidad').style.display = 'none';
+            productoEscaneadoTemporal = null;
+            document.getElementById('scannerInput').focus();
+        }
+        
+        function actualizarListaFactura() {
+            const container = document.getElementById('listaProductosFactura');
+            if (facturaActual.productos.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados.</p>';
+                return;
+            }
+            
+            let html = '', total = 0;
+            facturaActual.productos.forEach((p, i) => {
+                total += p.subtotal;
+                html += `<div class="producto-agregado">
+                    <div><strong>📦 ${p.nombre}</strong><br><small>Código: ${p.codigo}</small></div>
+                    <div><span class="cantidad-badge">${p.cantidad} ud</span> <span>$${p.subtotal.toLocaleString('es-ES')}</span>
+                    <button onclick="eliminarProductoFactura(${i})" style="background:#e74c3c; color:white; border:none; border-radius:5px; padding:5px 10px; cursor:pointer;">🗑️</button></div>
+                </div>`;
+            });
+            html += `<div style="margin-top:15px; padding:10px; background:#ecf0f1; border-radius:10px;"><strong>💰 Total: $${total.toLocaleString('es-ES')}</strong></div>`;
+            container.innerHTML = html;
+        }
+        
+        function eliminarProductoFactura(index) {
+            const p = facturaActual.productos[index];
+            if (confirm(`¿Eliminar ${p.nombre}?`)) {
+                registrarMovimientoStock(p.producto_id, 'SALIDA', p.cantidad, `CANCELACION - Factura ${facturaActual.numero}`, 'cajero');
+                facturaActual.productos.splice(index, 1);
+                actualizarListaFactura();
+                actualizarResumenStock();
+                actualizarContadorProductos();
+                mostrarToast('Producto eliminado', 'info');
+            }
+        }
+        
+        function actualizarContadorProductos() {
+            const total = facturaActual.productos.reduce((s, p) => s + p.cantidad, 0);
+            document.getElementById('totalProductosFactura').textContent = total;
+        }
+        
+        function finalizarFactura() {
+            if (facturaActual.productos.length === 0) {
+                mostrarToast('❌ No hay productos', 'error');
+                return;
+            }
+            const total = facturaActual.productos.reduce((s, p) => s + p.subtotal, 0);
+            let historial = JSON.parse(localStorage.getItem('facturas_compra')) || [];
+            historial.unshift({ ...facturaActual, total });
+            localStorage.setItem('facturas_compra', JSON.stringify(historial));
+            mostrarToast(`✅ Factura ${facturaActual.numero} finalizada. Total: $${total.toLocaleString('es-ES')}`, 'success');
+            facturaActual = { numero: null, proveedor: null, productos: [] };
+            document.getElementById('facturaNumero').innerHTML = 'No iniciada';
+            document.getElementById('facturaProveedor').innerHTML = '-';
+            document.getElementById('listaProductosFactura').innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados.</p>';
+            actualizarContadorProductos();
+            actualizarResumenStock();
+        }
+        
+        function cancelarFactura() {
+            if (facturaActual.productos.length && confirm('¿Cancelar factura? Se revertirá el stock.')) {
+                facturaActual.productos.forEach(p => {
+                    registrarMovimientoStock(p.producto_id, 'SALIDA', p.cantidad, 'CANCELACION_FACTURA', 'cajero');
+                });
+                facturaActual = { numero: null, proveedor: null, productos: [] };
+                document.getElementById('facturaNumero').innerHTML = 'No iniciada';
+                document.getElementById('facturaProveedor').innerHTML = '-';
+                document.getElementById('listaProductosFactura').innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados.</p>';
+                actualizarContadorProductos();
+                actualizarResumenStock();
+                mostrarToast('Factura cancelada', 'info');
+            }
+        }
+        
+        function actualizarResumenStock() {
+            const productos = DB.get('productos');
+            const tbody = document.getElementById('resumenStock');
+            if (productos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">No hay productos</td></tr>';
+                return;
+            }
+            let html = '';
+            productos.forEach(p => {
+                const estado = p.stock_actual <= p.stock_minimo ? '🔴 Bajo' : '✅ OK';
+                const color = p.stock_actual <= p.stock_minimo ? '#e74c3c' : '#27ae60';
+                html += `<tr><td>${p.nombre}</td><td style="color:${color}; font-weight:bold;">${p.stock_actual}</td><td>${p.stock_minimo}</td><td>${estado}</td></tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+        
+        function abrirModalAgregarProducto(codigo) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header"><h2>🆕 Nuevo Producto</h2><span class="close-modal" onclick="this.closest('.modal').remove()">&times;</span></div>
+                    <div class="form-group"><label>Código:</label><input type="text" id="nuevoCodigo" value="${codigo}" readonly style="background:#f0f0f0;"></div>
+                    <div class="form-group"><label>Nombre:</label><input type="text" id="nuevoNombre" placeholder="Ej: Coca-Cola 400ml"></div>
+                    <div class="form-group"><label>Precio venta:</label><input type="number" id="nuevoPrecio" placeholder="Ej: 2500"></div>
+                    <div class="form-group"><label>Categoría:</label><input type="text" id="nuevaCategoria" value="Bebidas"></div>
+                    <button onclick="agregarProductoNuevo(this, '${codigo}')" class="btn btn-success">✅ Agregar</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function agregarProductoNuevo(btn, codigo) {
+            const nombre = document.getElementById('nuevoNombre').value;
+            const precio = parseFloat(document.getElementById('nuevoPrecio').value);
+            if (!nombre || !precio) { mostrarToast('❌ Completa los datos', 'error'); return; }
+            agregarProducto(codigo, nombre, precio, 0, 5, document.getElementById('nuevaCategoria').value, 'Proveedor', null);
+            mostrarToast(`✅ ${nombre} agregado`, 'success');
+            btn.closest('.modal').remove();
+            actualizarResumenStock();
+        }
+        
+        // Configurar escáner
+        document.addEventListener('DOMContentLoaded', function() {
+            actualizarFecha();
+            actualizarEstadoTurno();
+            actualizarResumenStock();
+            setInterval(actualizarEstadoTurno, 5000);
+            
+            const scannerInput = document.getElementById('scannerInput');
+            if (scannerInput) {
+                scannerInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const codigo = e.target.value.trim();
+                        if (codigo) {
+                            if (!facturaActual.numero) {
+                                mostrarToast('❌ Primero inicia una factura', 'warning');
+                                e.target.value = '';
+                                return;
+                            }
+                            procesarProductoEscaneado(codigo);
+                            e.target.value = '';
+                        }
+                    }
+                });
+            }
+        });
+        
+        window.iniciarNuevaFactura = iniciarNuevaFactura;
+        window.finalizarFactura = finalizarFactura;
+        window.cancelarFactura = cancelarFactura;
+        window.eliminarProductoFactura = eliminarProductoFactura;
+        window.cerrarModalCantidad = cerrarModalCantidad;
+        window.confirmarAgregarProducto = confirmarAgregarProducto;
+        window.formatearNumero = formatearNumero;
+        window.formatearNumeroCompleto = formatearNumeroCompleto;
+    </script>
+</body>
+</html>

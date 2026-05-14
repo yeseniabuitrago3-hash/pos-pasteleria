@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ventas - POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* Estilo para inputs de dinero */
+        .money-input {
+            font-family: monospace;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Resaltar input de escáner */
+        .scanner-input {
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧁 POS Pastelería - Ventas</h1>
+            <div class="fecha" id="fechaActual"></div>
+        </div>
+
+        <nav class="main-nav">
+            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+</nav>
+
+
+        
+        
+        <div id="alertContainer"></div>
+        
+        <div class="dashboard">
+            <!-- Pasteles -->
+            <div class="card">
+                <h3>🍰 Pasteles ($2.000 c/u)</h3>
+                <div class="form-group">
+                    <label>Cantidad de pasteles:</label>
+                    <input type="text" id="cantidadPasteles" class="money-input" 
+                           placeholder="Ej: 5" 
+                           oninput="validarNumeroEntero(this)"
+                           onblur="formatearNumeroEntero(this)">
+                </div>
+                <button onclick="agregarPastel()" class="btn btn-primary">➕ Agregar pastel</button>
+                
+                <div style="margin-top:20px;">
+                    <h4>Vendidos:</h4>
+                    <div id="listaPastelesVendidos"></div>
+                </div>
+            </div>
+            
+            <!-- Bebidas con escáner -->
+            <div class="card">
+                <h3>🥤 Bebidas / Gaseosas</h3>
+                <div class="form-group">
+                    <label>Código del producto:</label>
+                    <input type="text" id="scannerInput" class="scanner-input" 
+                           placeholder="Escanea el código de barras" autofocus>
+                </div>
+                
+                <div style="margin-top:20px;">
+                    <h4>Productos vendidos:</h4>
+                    <div id="listaBebidasVendidas"></div>
+                </div>
+            </div>
+            
+            <!-- Nequi -->
+            <div class="card">
+                <h3>📱 Transferencias Nequi</h3>
+                <div class="form-group">
+                    <label>Monto:</label>
+                    <input type="text" id="montoNequi" class="money-input" 
+                           placeholder="Ej: 15.000"
+                           oninput="formatearNumero(this)"
+                           onblur="formatearNumeroCompleto(this)">
+                </div>
+                <div class="form-group">
+                    <label>Referencia:</label>
+                    <input type="text" id="refNequi" placeholder="Opcional">
+                </div>
+                <button onclick="agregarTransferenciaNequi()" class="btn btn-primary">➕ Registrar Nequi</button>
+            </div>
+        </div>
+        
+        <!-- Totales -->
+        <div class="card">
+            <h3>💰 Totales del día</h3>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:15px;">
+                <div>
+                    <p><strong>Pasteles:</strong></p>
+                    <p id="totalPasteles">$0</p>
+                </div>
+                <div>
+                    <p><strong>Bebidas efectivo:</strong></p>
+                    <p id="totalBebidas">$0</p>
+                </div>
+                <div>
+                    <p><strong>Total Nequi:</strong></p>
+                    <p id="totalNequi">$0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top:20px; display:flex; gap:10px;">
+            <button onclick="window.location.href='../index.html'" class="btn">⬅️ Volver</button>
+            <button onclick="window.location.href='cierre.html'" class="btn btn-success">📊 Ir a cierre</button>
+        </div>
+    </div>
+    
+    <script src="../js/database.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        // ==================== FUNCIONES PARA FORMATEAR NÚMEROS ====================
+        
+        // Formatear números con puntos (para montos)
+        function formatearNumero(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
+            let numero = parseInt(valor, 10);
+            input.value = numero.toLocaleString('es-ES');
+        }
+        
+        function formatearNumeroCompleto(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
+            let numero = parseInt(valor, 10);
+            input.value = numero.toLocaleString('es-ES');
+        }
+        
+        // Para números enteros (cantidad de pasteles) - sin puntos
+        function validarNumeroEntero(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
+            input.value = parseInt(valor, 10);
+        }
+        
+        function formatearNumeroEntero(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
+            input.value = parseInt(valor, 10);
+        }
+        
+        // Obtener valor numérico real (sin puntos)
+        function obtenerValorNumerico(inputId) {
+            const input = document.getElementById(inputId);
+            let valor = input.value.replace(/[^0-9]/g, '');
+            return valor === '' ? 0 : parseInt(valor, 10);
+        }
+        
+        // ==================== FUNCIONES DE VENTAS ====================
+        
+        function actualizarFecha() {
+            const hoy = new Date();
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('fechaActual').textContent = hoy.toLocaleDateString('es-ES', opciones);
+        }
+        
+        function actualizarListaVentas() {
+            const apertura = getAperturaActual();
+            if (!apertura) return;
+            
+            const ventas = DB.find('ventas_pasteles', 'apertura_id', apertura.id);
+            const container = document.getElementById('listaPastelesVendidos');
+            
+            if (container) {
+                if (ventas.length === 0) {
+                    container.innerHTML = '<p>No hay pasteles vendidos</p>';
+                } else {
+                    let html = '<ul style="list-style:none; padding-left:0;">';
+                    ventas.forEach(v => {
+                        const fecha = new Date(v.fecha).toLocaleTimeString();
+                        html += `<li style="padding:5px 0; border-bottom:1px solid #eee;">
+                                    📅 ${fecha} - ${v.cantidad} ud - $${v.total.toLocaleString('es-ES')}
+                                </li>`;
+                    });
+                    html += '</ul>';
+                    container.innerHTML = html;
+                }
+            }
+        }
+        
+        function actualizarListaBebidas() {
+            const apertura = getAperturaActual();
+            if (!apertura) return;
+            
+            const ventas = DB.find('ventas_bebidas', 'apertura_id', apertura.id);
+            const container = document.getElementById('listaBebidasVendidas');
+            const productos = DB.get('productos');
+            
+            if (container) {
+                if (ventas.length === 0) {
+                    container.innerHTML = '<p>No hay bebidas vendidas</p>';
+                } else {
+                    let html = '<ul style="list-style:none; padding-left:0;">';
+                    ventas.forEach(v => {
+                        const producto = productos.find(p => p.id === v.producto_id);
+                        const nombre = producto ? producto.nombre : 'Desconocido';
+                        const fecha = new Date(v.fecha).toLocaleTimeString();
+                        html += `<li style="padding:5px 0; border-bottom:1px solid #eee;">
+                                    📅 ${fecha} - ${nombre} - $${v.subtotal.toLocaleString('es-ES')}
+                                </li>`;
+                    });
+                    html += '</ul>';
+                    container.innerHTML = html;
+                }
+            }
+        }
+        
+        function actualizarTotales() {
+            const apertura = getAperturaActual();
+            if (!apertura) return;
+            
+            const resumen = getResumenVentas(apertura.id);
+            document.getElementById('totalPasteles').textContent = `$${resumen.totalPasteles.toLocaleString('es-ES')}`;
+            document.getElementById('totalBebidas').textContent = `$${resumen.totalBebidas.toLocaleString('es-ES')}`;
+            document.getElementById('totalNequi').textContent = `$${resumen.totalNequi.toLocaleString('es-ES')}`;
+        }
+        
+        function agregarPastel() {
+            // Obtener cantidad del input formateado
+            let cantidadInput = document.getElementById('cantidadPasteles');
+            let cantidad = parseInt(cantidadInput.value.replace(/[^0-9]/g, '')) || 0;
+            
+            if (cantidad <= 0) {
+                mostrarMensaje('❌ Ingresa una cantidad válida de pasteles', 'error');
+                return;
+            }
+            
+            const apertura = getAperturaActual();
+            if (!apertura) {
+                mostrarMensaje('❌ No hay un turno abierto. Realiza la apertura primero', 'error');
+                return;
+            }
+            
+            venderPastel(cantidad, apertura.id);
+            mostrarMensaje(`✅ ${cantidad} pastel(es) vendido(s) por $${(cantidad * 2000).toLocaleString('es-ES')}`, 'success');
+            
+            // Limpiar input
+            cantidadInput.value = '';
+            actualizarListaVentas();
+            actualizarTotales();
+        }
+        
+        function agregarTransferenciaNequi() {
+            // Obtener monto del input formateado
+            let montoInput = document.getElementById('montoNequi');
+            let monto = obtenerValorNumerico('montoNequi');
+            const referencia = document.getElementById('refNequi').value;
+            
+            if (monto <= 0) {
+                mostrarMensaje('❌ Ingresa un monto válido', 'error');
+                return;
+            }
+            
+            const apertura = getAperturaActual();
+            if (!apertura) {
+                mostrarMensaje('❌ No hay un turno abierto', 'error');
+                return;
+            }
+            
+            const transferencia = {
+                apertura_id: apertura.id,
+                monto: monto,
+                referencia: referencia || 'Sin referencia',
+                fecha: new Date().toISOString()
+            };
+            
+            DB.add('transferencias_nequi', transferencia);
+            mostrarMensaje(`✅ Transferencia Nequi por $${monto.toLocaleString('es-ES')} registrada`, 'success');
+            
+            // Limpiar inputs
+            montoInput.value = '';
+            document.getElementById('refNequi').value = '';
+            actualizarTotales();
+        }
+        
+        // Función para mostrar mensajes temporales
+        function mostrarMensaje(mensaje, tipo) {
+            const container = document.getElementById('alertContainer');
+            if (!container) return;
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${tipo}`;
+            alertDiv.innerHTML = `
+                <span>${mensaje}</span>
+                <button onclick="this.parentElement.remove()" style="float:right; background:none; border:none; cursor:pointer;">✖</button>
+            `;
+            
+            container.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                if (alertDiv.parentElement) alertDiv.remove();
+            }, 3000);
+        }
+        
+        // ==================== CONFIGURAR ESCÁNER ====================
+        function configurarScanner() {
+            const scannerInput = document.getElementById('scannerInput');
+            if (scannerInput) {
+                scannerInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const codigo = e.target.value.trim();
+                        
+                        if (codigo) {
+                            procesarProductoEscaneado(codigo);
+                            e.target.value = '';
+                        }
+                    }
+                });
+                console.log('📷 Escáner configurado');
+            }
+        }
+        
+        function procesarProductoEscaneado(codigo) {
+            const productos = DB.find('productos', 'codigo_barras', codigo);
+            
+            if (productos.length === 0) {
+                mostrarMensaje(`❌ Producto con código ${codigo} no encontrado`, 'error');
+                
+                if (confirm(`Producto no registrado.\n¿Desea agregar "${codigo}" al inventario?`)) {
+                    window.location.href = 'inventario.html';
+                }
+                return;
+            }
+            
+            const producto = productos[0];
+            
+            if (producto.stock_actual <= 0) {
+                mostrarMensaje(`❌ ${producto.nombre} - ¡SIN STOCK!`, 'error');
+                return;
+            }
+            
+            const apertura = getAperturaActual();
+            if (!apertura) {
+                mostrarMensaje('❌ No hay un turno abierto', 'error');
+                return;
+            }
+            
+            venderBebida(apertura.id, producto);
+            mostrarMensaje(`✅ ${producto.nombre} vendido por $${producto.precio.toLocaleString('es-ES')}`, 'success');
+            
+            actualizarListaBebidas();
+            actualizarTotales();
+        }
+        
+        // ==================== INICIALIZAR ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            actualizarFecha();
+            actualizarListaVentas();
+            actualizarListaBebidas();
+            actualizarTotales();
+            configurarScanner();
+        });
+        
+        // Hacer funciones globales para los botones
+        window.agregarPastel = agregarPastel;
+        window.agregarTransferenciaNequi = agregarTransferenciaNequi;
+        window.formatearNumero = formatearNumero;
+        window.formatearNumeroCompleto = formatearNumeroCompleto;
+        window.validarNumeroEntero = validarNumeroEntero;
+        window.formatearNumeroEntero = formatearNumeroEntero;
+    </script>
+</body>
+</html>
