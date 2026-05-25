@@ -6,52 +6,132 @@
     <title>Apertura de Caja - POS Pastelería</title>
     <link rel="stylesheet" href="../css/styles.css">
     <style>
-        /* Estilo para mejorar la visualización de números */
         .money-input {
             font-family: monospace;
             font-size: 1.2rem;
             letter-spacing: 0.5px;
         }
+        
+        .selector-turno {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-turno {
+            flex: 1;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 16px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .btn-turno:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        }
+        
+        .btn-turno.selected {
+            border-color: #8B4513;
+            background: linear-gradient(135deg, #FFF8F0, #FFF0E4);
+            box-shadow: 0 5px 15px rgba(139, 69, 19, 0.2);
+        }
+        
+        .btn-turno h3 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+        
+        .btn-turno p {
+            color: #666;
+            font-size: 0.85rem;
+        }
+        
+        .btn-manana { border-left: 4px solid #27ae60; }
+        .btn-tarde { border-left: 4px solid #e67e22; }
+        
+        .modo-info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 4px solid #8B4513;
+        }
+        
+        .modo-manana { border-left-color: #27ae60; background: #e8f5e9; }
+        .modo-tarde { border-left-color: #e67e22; background: #fff3e0; }
+        
+        .campo-opcional { opacity: 0.6; }
     </style>
 </head>
-<nav class="main-nav">
-            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
-            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
-            <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
-            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
-            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
-            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
-            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
-            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
-</nav> 
-
 <body>
     <div class="container">
         <div class="card">
             <h2>🚀 Apertura de Caja</h2>
             <p id="fechaDisplay"></p>
             
+            <!-- SELECTOR DE TURNO -->
+            <div class="selector-turno">
+                <div class="btn-turno btn-manana" id="btnModoManana" onclick="seleccionarModo('manana')">
+                    <h3>🌅 TURNO MAÑANA</h3>
+                    <p>Dueño presente - Solo control de inventario</p>
+                    <small>✅ Sin conteo de dinero | ✅ Solo escáner y ventas</small>
+                </div>
+                <div class="btn-turno btn-tarde" id="btnModoTarde" onclick="seleccionarModo('tarde')">
+                    <h3>🌙 TURNO TARDE</h3>
+                    <p>Empleada sola - Control TOTAL de dinero</p>
+                    <small>⚠️ Con conteo de base | ⚠️ Cierre obligatorio</small>
+                </div>
+            </div>
+            
+            <!-- INFORMACIÓN DEL MODO SELECCIONADO -->
+            <div class="modo-info" id="modoInfo">
+                <strong id="modoTitulo">🌅 Modo Mañana</strong>
+                <p id="modoDescripcion">Modo simplificado - Solo control de inventario. No requiere contar dinero.</p>
+            </div>
+            
             <form id="formApertura">
+                <!-- Campos de dinero (solo para modo tarde) -->
+                <div id="camposDinero" style="display: none;">
+                    <div class="form-group">
+                        <label>💰 Base en billetes</label>
+                        <input type="text" id="baseBilletes" class="money-input" 
+                               placeholder="Ej: 150.000"
+                               oninput="formatearNumero(this)"
+                               onblur="formatearNumeroCompleto(this)">
+                        <small>Monto total en billetes físicos disponibles.</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🪙 Base en monedas</label>
+                        <input type="text" id="baseMonedas" class="money-input" 
+                               placeholder="Ej: 15.000"
+                               oninput="formatearNumero(this)"
+                               onblur="formatearNumeroCompleto(this)">
+                        <small>Monto total en monedas para dar cambio.</small>
+                    </div>
+                </div>
+                
+                <!-- Campos siempre visibles -->
                 <div class="form-group">
-                    <label>💰 Base en billetes</label>
-                    <input type="text" id="baseBilletes" class="money-input" 
-                           placeholder="Ej: 150.000" required
-                           oninput="formatearNumero(this)"
-                           onblur="formatearNumeroCompleto(this)">
-                    <small>Monto total en billetes físicos disponibles.</small>
+                    <label>👤 Nombre del responsable</label>
+                    <input type="text" id="nombreResponsable" 
+                           placeholder="Dueño / Empleada" required>
+                    <small>Quién está operando el turno actual</small>
                 </div>
                 
                 <div class="form-group">
-                    <label>🪙 Base en monedas</label>
-                    <input type="text" id="baseMonedas" class="money-input" 
-                           placeholder="Ej: 15.000" required
-                           oninput="formatearNumero(this)"
-                           onblur="formatearNumeroCompleto(this)">
-                    <small>Monto total en monedas para dar cambio.</small>
+                    <label>📝 Observaciones iniciales</label>
+                    <textarea id="observaciones" rows="2" 
+                              placeholder="Ej: Inventario inicial verificado, todo en orden"></textarea>
                 </div>
                 
                 <button type="button" onclick="registrarApertura()" class="btn btn-primary">
-                    ✅ Registrar apertura
+                    ✅ Iniciar turno
                 </button>
                 <button type="button" onclick="window.location.href='../index.html'" class="btn">
                     ⬅️ Cancelar
@@ -63,114 +143,120 @@
     <script src="../js/database.js"></script>
     <script src="../js/app.js"></script>
     <script>
+        let modoSeleccionado = 'manana';
+        
         // Mostrar fecha
-        document.getElementById('fechaDisplay').innerHTML = new Date().toLocaleDateString('es-ES', {
+        document.getElementById('fechaDisplay').innerHTML = new Date().toLocaleDateString('es-CO', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
         
-        // ==================== FUNCIONES PARA FORMATEAR NÚMEROS ====================
-        
-        // Función para formatear número mientras se escribe
-        function formatearNumero(input) {
-            // Obtener el valor actual y eliminar cualquier carácter que no sea número
-            let valor = input.value.replace(/[^0-9]/g, '');
+        function seleccionarModo(modo) {
+            modoSeleccionado = modo;
             
+            // Actualizar estilos de botones
+            const btnManana = document.getElementById('btnModoManana');
+            const btnTarde = document.getElementById('btnModoTarde');
+            const camposDinero = document.getElementById('camposDinero');
+            const modoInfo = document.getElementById('modoInfo');
+            const titulo = document.getElementById('modoTitulo');
+            const descripcion = document.getElementById('modoDescripcion');
+            
+            if (modo === 'manana') {
+                btnManana.classList.add('selected');
+                btnTarde.classList.remove('selected');
+                camposDinero.style.display = 'none';
+                modoInfo.className = 'modo-info modo-manana';
+                titulo.innerHTML = '🌅 Modo Mañana - Dueño presente';
+                descripcion.innerHTML = '✅ Solo control de inventario y productos vendidos<br>❌ No se requiere contar dinero de base<br>✅ Cierre simplificado (solo registrar ventas)';
+            } else {
+                btnTarde.classList.add('selected');
+                btnManana.classList.remove('selected');
+                camposDinero.style.display = 'block';
+                modoInfo.className = 'modo-info modo-tarde';
+                titulo.innerHTML = '🌙 Modo Tarde - Empleada sola';
+                descripcion.innerHTML = '✅ Control TOTAL: ventas, dinero, Nequi, cierre de caja<br>⚠️ Debes contar el dinero inicial exacto<br>⚠️ Al cerrar se calculará la diferencia automáticamente';
+            }
+            
+            sessionStorage.setItem('modoTurno', modo);
+        }
+        
+        function formatearNumero(input) {
+            let valor = input.value.replace(/[^0-9]/g, '');
             if (valor === '') {
                 input.value = '';
                 return;
             }
-            
-            // Convertir a número entero
             let numero = parseInt(valor, 10);
-            
-            // Formatear con puntos de mil
-            input.value = numero.toLocaleString('es-ES');
+            input.value = numero.toLocaleString('es-CO');
         }
         
-        // Función para formatear al perder el foco (completar)
         function formatearNumeroCompleto(input) {
             let valor = input.value.replace(/[^0-9]/g, '');
-            
             if (valor === '') {
                 input.value = '';
                 return;
             }
-            
             let numero = parseInt(valor, 10);
-            input.value = numero.toLocaleString('es-ES');
+            input.value = numero.toLocaleString('es-CO');
         }
         
-        // Función para obtener el valor numérico real (sin puntos)
         function obtenerValorNumerico(inputId) {
             const input = document.getElementById(inputId);
+            if (!input) return 0;
             let valor = input.value.replace(/[^0-9]/g, '');
             return valor === '' ? 0 : parseInt(valor, 10);
         }
         
-        // Función para registrar apertura (modificada)
         function registrarApertura() {
-            // Obtener los valores numéricos reales
-            const billetes = obtenerValorNumerico('baseBilletes');
-            const monedas = obtenerValorNumerico('baseMonedas');
-            
-            // Validar
-            if (billetes === 0 && monedas === 0) {
-                alert('❌ Por favor, ingresa la base inicial de efectivo');
+            const nombre = document.getElementById('nombreResponsable').value;
+            if (!nombre) {
+                alert('❌ Ingresa el nombre del responsable');
                 return;
             }
             
-            // Mostrar resumen
-            const total = billetes + monedas;
-            const confirmar = confirm(`✅ Confirmar apertura:\n\n💰 Billetes: $${billetes.toLocaleString('es-ES')}\n🪙 Monedas: $${monedas.toLocaleString('es-ES')}\n📊 Total base: $${total.toLocaleString('es-ES')}\n\n¿Deseas continuar?`);
+            let billetes = 0, monedas = 0, baseTotal = 0;
+            
+            if (modoSeleccionado === 'tarde') {
+                billetes = obtenerValorNumerico('baseBilletes');
+                monedas = obtenerValorNumerico('baseMonedas');
+                baseTotal = billetes + monedas;
+                
+                if (baseTotal === 0) {
+                    alert('❌ En modo tarde debes ingresar la base de dinero inicial');
+                    return;
+                }
+            }
+            
+            const confirmar = confirm(`✅ Confirmar apertura:\n\n📋 Modo: ${modoSeleccionado === 'manana' ? 'MAÑANA (Dueño)' : 'TARDE (Empleada)'}\n👤 Responsable: ${nombre}${modoSeleccionado === 'tarde' ? `\n💰 Base total: $${baseTotal.toLocaleString('es-CO')}` : ''}\n\n¿Deseas continuar?`);
             
             if (!confirmar) return;
             
-            // Crear objeto de apertura
             const apertura = {
+                id: Date.now(),
+                modo: modoSeleccionado,
+                responsable: nombre,
                 base_billetes: billetes,
                 base_monedas: monedas,
-                base_total: total,
+                base_total: baseTotal,
                 fecha: new Date().toISOString(),
-                usuario: 'cajero',
+                observaciones: document.getElementById('observaciones').value || '',
                 estado: 'abierta'
             };
             
-            // Guardar en la base de datos
             DB.add('aperturas_caja', apertura);
+            sessionStorage.setItem('aperturaActual', JSON.stringify(apertura));
             
-            // Mostrar mensaje de éxito
-            alert(`✅ ¡Apertura registrada con éxito!\n\n💰 Base total: $${total.toLocaleString('es-ES')}\n\nRedirigiendo a la página de ventas...`);
+            // Registrar actividad en log
+            registrarActividad('APERTURA', `Turno ${modoSeleccionado} iniciado por ${nombre}`, apertura.id);
             
-            // Redirigir a ventas
+            alert(`✅ ¡Apertura registrada con éxito!\n\n📋 Modo: ${modoSeleccionado === 'manana' ? 'MAÑANA' : 'TARDE'}\n👤 Responsable: ${nombre}\n\nRedirigiendo a la página de ventas...`);
+            
             window.location.href = 'ventas.html';
         }
         
-        // Función para permitir solo números al pegar contenido
-        function sanitizarPegado(input) {
-            setTimeout(() => {
-                let valor = input.value.replace(/[^0-9]/g, '');
-                if (valor === '') {
-                    input.value = '';
-                } else {
-                    let numero = parseInt(valor, 10);
-                    input.value = numero.toLocaleString('es-ES');
-                }
-            }, 10);
-        }
-        
-        // Agregar evento para limpiar pegado
-        document.getElementById('baseBilletes').addEventListener('paste', function() {
-            sanitizarPegado(this);
-        });
-        
-        document.getElementById('baseMonedas').addEventListener('paste', function() {
-            sanitizarPegado(this);
-        });
-        
-        // Hacer que las funciones sean globales
-        window.registrarApertura = registrarApertura;
-        window.formatearNumero = formatearNumero;
-        window.formatearNumeroCompleto = formatearNumeroCompleto;
+        // Inicializar modo por defecto
+        const modoGuardado = sessionStorage.getItem('modoTurno') || 'manana';
+        seleccionarModo(modoGuardado);
     </script>
 </body>
 </html>

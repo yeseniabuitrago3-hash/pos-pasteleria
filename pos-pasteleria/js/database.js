@@ -514,3 +514,128 @@ function getComparativaMensualAnioActual() {
 }
 
 // Exportar funciones si se usa módulos, pero como es global, ya están disponibles
+
+// ==================== FUNCIONES ANTIFRAUDE Y SEGURIDAD ====================
+
+// Registrar actividad en el log
+function registrarActividad(tipo, descripcion, aperturaId = null) {
+    const log = {
+        id: Date.now(),
+        tipo: tipo, // APERTURA, VENTA, CIERRE_MANANA, CIERRE_TARDE, ALERTA
+        descripcion: descripcion,
+        apertura_id: aperturaId,
+        usuario: getUsuarioActual(),
+        fecha: new Date().toISOString(),
+        ip: obtenerIPLocal()
+    };
+    
+    const logs = DB.get('logs_actividad') || [];
+    logs.push(log);
+    DB.set('logs_actividad', logs);
+    
+    console.log(`📝 [LOG] ${tipo}: ${descripcion}`);
+}
+
+// Obtener usuario actual
+function getUsuarioActual() {
+    const apertura = getAperturaActual();
+    if (apertura && apertura.responsable) {
+        return apertura.responsable;
+    }
+    return 'sistema';
+}
+
+// Obtener IP local (simulada)
+function obtenerIPLocal() {
+    // En un entorno real, se obtendría del servidor
+    return '127.0.0.1';
+}
+
+// Enviar alerta por WhatsApp (simulado - en producción se integraría con API)
+function enviarAlertaWhatsApp(empleada, diferencia) {
+    const mensaje = `⚠️ ALERTA POS PASTELERÍA ⚠️
+
+Empleada: ${empleada}
+Diferencia detectada: ${diferencia > 0 ? 'SOBRANTE' : 'FALTANTE'} de $${Math.abs(diferencia).toLocaleString('es-CO')}
+Fecha: ${new Date().toLocaleString('es-CO')}
+
+Por favor revisar el reporte detallado.`;
+
+    console.log('📱 [ALERTA WHATSAPP]', mensaje);
+    
+    // Guardar alerta en base de datos
+    const alertas = DB.get('alertas_seguridad') || [];
+    alertas.push({
+        id: Date.now(),
+        tipo: 'DIFERENCIA_CAJA',
+        empleada: empleada,
+        diferencia: diferencia,
+        mensaje: mensaje,
+        fecha: new Date().toISOString(),
+        leida: false
+    });
+    DB.set('alertas_seguridad', alertas);
+    
+    // Aquí se integraría con API real de WhatsApp
+    // Ejemplo: fetch('https://api.whatsapp.com/send?phone=...')
+}
+
+// Obtener resumen de ventas del día (separado por turnos)
+function getResumenVentasDiario(fecha) {
+    const cierres = DB.get('cierres_caja') || [];
+    const fechaInicio = new Date(fecha);
+    fechaInicio.setHours(0, 0, 0, 0);
+    const fechaFin = new Date(fecha);
+    fechaFin.setHours(23, 59, 59, 999);
+    
+    const cierresDia = cierres.filter(c => {
+        const fechaCierre = new Date(c.fecha_cierre);
+        return fechaCierre >= fechaInicio && fechaCierre <= fechaFin;
+    });
+    
+    const turnoManana = cierresDia.find(c => c.modo === 'manana');
+    const turnoTarde = cierresDia.find(c => c.modo === 'tarde');
+    
+    return {
+        manana: turnoManana || null,
+        tarde: turnoTarde || null,
+        totalVentas: (turnoManana ? (turnoManana.total_ventas_pasteles + turnoManana.total_ventas_bebidas) : 0) +
+                     (turnoTarde ? (turnoTarde.total_ventas_pasteles + turnoTarde.total_ventas_bebidas) : 0),
+        totalNequi: (turnoTarde ? turnoTarde.total_nequi : 0)
+    };
+}
+
+// Verificar integridad de datos (detectar posibles manipulaciones)
+function verificarIntegridadDatos() {
+    const alertas = [];
+    const logs = DB.get('logs_actividad') || [];
+    
+    // Verificar si hay cierres sin apertura correspondiente
+    const cierres = DB.get('cierres_caja') || [];
+    const aperturas = DB.get('aperturas_caja') || [];
+    
+    cierres.forEach(cierre => {
+        const apertura = aperturas.find(a => a.id === cierre.apertura_id);
+        if (!apertura) {
+            alertas.push({
+                tipo: 'CIERRE_SIN_APERTURA',
+                descripcion: `Cierre ID ${cierre.id} no tiene apertura asociada`,
+                fecha: new Date().toISOString()
+            });
+        }
+    });
+    
+    if (alertas.length > 0) {
+        console.warn('⚠️ Alertas de integridad detectadas:', alertas);
+        DB.set('alertas_integridad', alertas);
+    }
+    
+    return alertas;
+}
+
+// Exportar funciones
+window.registrarActividad = registrarActividad;
+window.getUsuarioActual = getUsuarioActual;
+window.enviarAlertaWhatsApp = enviarAlertaWhatsApp;
+window.getResumenVentasDiario = getResumenVentasDiario;
+window.verificarIntegridadDatos = verificarIntegridadDatos;

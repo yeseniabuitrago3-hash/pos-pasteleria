@@ -185,11 +185,11 @@
     <script src="../js/scanner.js"></script>
     <script>
 
-
-        let cierresTotales = [];       // Todos los registros (sin filtrar)
+let cierresTotales = [];       // Todos los registros (sin filtrar)
     let cierresFiltrados = [];     // Registros después de aplicar filtros
-    let registrosMostrados = 0;    // Cuántos registros ya se mostraron
+    let indiceActual = 0;          // Cambiado: índice actual en lugar de registrosMostrados
     const REGISTROS_POR_PAGINA = 5; // Mostrar 5 al inicio
+    let cargandoMas = false;       // Prevenir múltiples cargas simultáneas
 
     // Actualizar fecha
     function actualizarFecha() {
@@ -222,69 +222,147 @@
         tbody.appendChild(fila);
     }
 
+    // Limpiar la tabla
+    function limpiarTabla() {
+        const tbody = document.getElementById('cuerpoHistorial');
+        tbody.innerHTML = '';
+    }
+
     // Cargar más registros (siguiente lote)
     function cargarMasRegistros() {
-        const siguienteLote = cierresFiltrados.slice(registrosMostrados, registrosMostrados + REGISTROS_POR_PAGINA);
+        // Prevenir múltiples cargas simultáneas
+        if (cargandoMas) return;
+        cargandoMas = true;
         
-        if (siguienteLote.length === 0) {
+        console.log('Intentando cargar más registros...');
+        console.log('Indice actual:', indiceActual);
+        console.log('Total registros:', cierresFiltrados.length);
+        
+        // Si ya no hay más registros para mostrar
+        if (indiceActual >= cierresFiltrados.length) {
+            console.log('No hay más registros para mostrar');
             document.getElementById('btnVerMas').style.display = 'none';
+            cargandoMas = false;
             return;
         }
         
-        if (registrosMostrados === 0) {
-            document.getElementById('cuerpoHistorial').innerHTML = '';
+        // Si es la primera carga (índice es 0), limpiar la tabla
+        if (indiceActual === 0) {
+            limpiarTabla();
         }
         
+        // Obtener el siguiente lote de registros
+        const siguienteLote = cierresFiltrados.slice(indiceActual, indiceActual + REGISTROS_POR_PAGINA);
+        
+        if (siguienteLote.length === 0) {
+            document.getElementById('btnVerMas').style.display = 'none';
+            cargandoMas = false;
+            return;
+        }
+        
+        // Agregar los registros a la tabla
         siguienteLote.forEach(cierre => {
             agregarFilaTabla(cierre);
         });
         
-        registrosMostrados += siguienteLote.length;
+        // Actualizar el índice
+        indiceActual += siguienteLote.length;
         
-        if (registrosMostrados < cierresFiltrados.length) {
+        console.log('Nuevo índice:', indiceActual);
+        
+        // Mostrar u ocultar el botón según si quedan registros
+        if (indiceActual < cierresFiltrados.length) {
             document.getElementById('btnVerMas').style.display = 'block';
+            document.getElementById('btnVerMas').textContent = `📋 Ver más registros (${cierresFiltrados.length - indiceActual} restantes)`;
         } else {
             document.getElementById('btnVerMas').style.display = 'none';
         }
+        
+        cargandoMas = false;
+    }
+
+    // Reiniciar la paginación (para cuando se aplican filtros o se carga inicialmente)
+    function reiniciarPaginacion() {
+        indiceActual = 0;
+        limpiarTabla();
+        cargarMasRegistros();
     }
 
     // Actualizar resumen de totales (según los datos filtrados)
-    function actualizarResumenTotales(historial) {
-        const totalCierres = historial.length;
-        const totalVentas = historial.reduce((sum, c) => sum + (c.total_ventas_pasteles || 0) + (c.total_ventas_bebidas || 0), 0);
-        const totalNequi = historial.reduce((sum, c) => sum + (c.total_nequi || 0), 0);
-        const totalDescuadres = historial.reduce((sum, c) => sum + Math.abs(c.diferencia || 0), 0);
+    function actualizarResumenTotales() {
+        // Crear el resumen si no existe
+        let resumenDiv = document.querySelector('.resumen-totales');
+        if (!resumenDiv) {
+            resumenDiv = document.createElement('div');
+            resumenDiv.className = 'resumen-totales';
+            const card = document.querySelector('.card');
+            if (card) {
+                card.parentNode.insertBefore(resumenDiv, card.nextSibling);
+            }
+            resumenDiv.innerHTML = `
+                <div><span>📊 Total Cierres</span><strong id="totalCierres">0</strong></div>
+                <div><span>💰 Total Ventas</span><strong id="totalVentas">$0</strong></div>
+                <div><span>📱 Total Nequi</span><strong id="totalNequiGlobal">$0</strong></div>
+                <div><span>⚠️ Total Descuadres</span><strong id="totalDescuadres">$0</strong></div>
+            `;
+        }
         
-        document.getElementById('totalCierres').textContent = totalCierres;
-        document.getElementById('totalVentas').textContent = `$${totalVentas.toLocaleString()}`;
-        document.getElementById('totalNequiGlobal').textContent = `$${totalNequi.toLocaleString()}`;
-        document.getElementById('totalDescuadres').textContent = `$${totalDescuadres.toLocaleString()}`;
+        const totalCierres = cierresFiltrados.length;
+        const totalVentas = cierresFiltrados.reduce((sum, c) => sum + (c.total_ventas_pasteles || 0) + (c.total_ventas_bebidas || 0), 0);
+        const totalNequi = cierresFiltrados.reduce((sum, c) => sum + (c.total_nequi || 0), 0);
+        const totalDescuadres = cierresFiltrados.reduce((sum, c) => sum + Math.abs(c.diferencia || 0), 0);
+        
+        const totalCierresElem = document.getElementById('totalCierres');
+        const totalVentasElem = document.getElementById('totalVentas');
+        const totalNequiGlobalElem = document.getElementById('totalNequiGlobal');
+        const totalDescuadresElem = document.getElementById('totalDescuadres');
+        
+        if (totalCierresElem) totalCierresElem.textContent = totalCierres;
+        if (totalVentasElem) totalVentasElem.textContent = `$${totalVentas.toLocaleString()}`;
+        if (totalNequiGlobalElem) totalNequiGlobalElem.textContent = `$${totalNequi.toLocaleString()}`;
+        if (totalDescuadresElem) totalDescuadresElem.textContent = `$${totalDescuadres.toLocaleString()}`;
     }
 
-    // Cargar historial completo (paginado)
+    // Cargar historial completo
     function cargarHistorial() {
-        const cierres = DB.get('cierres_caja');
-        const aperturas = DB.get('aperturas_caja');
-        
-        cierresTotales = cierres.map(cierre => {
-            const apertura = aperturas.find(a => a.id === cierre.apertura_id);
-            return {
-                ...cierre,
-                base_total: apertura ? apertura.base_total : 0,
-                base_billetes: apertura ? apertura.base_billetes : 0,
-                base_monedas: apertura ? apertura.base_monedas : 0
-            };
-        });
-        
-        // Ordenar de más reciente a más antiguo
-        cierresTotales.sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
-        
-        // Inicializar filtrados
-        cierresFiltrados = [...cierresTotales];
-        registrosMostrados = 0;
-        document.getElementById('cuerpoHistorial').innerHTML = '';
-        cargarMasRegistros();
-        actualizarResumenTotales(cierresFiltrados);
+        try {
+            const cierres = DB.get('cierres_caja');
+            const aperturas = DB.get('aperturas_caja');
+            
+            console.log('Cierres encontrados:', cierres.length);
+            
+            if (!cierres || cierres.length === 0) {
+                document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8">No hay registros de cierres</td></tr>';
+                document.getElementById('btnVerMas').style.display = 'none';
+                return;
+            }
+            
+            cierresTotales = cierres.map(cierre => {
+                const apertura = aperturas.find(a => a.id === cierre.apertura_id);
+                return {
+                    ...cierre,
+                    base_total: apertura ? apertura.base_total : 0,
+                    base_billetes: apertura ? apertura.base_billetes : 0,
+                    base_monedas: apertura ? apertura.base_monedas : 0
+                };
+            });
+            
+            // Ordenar de más reciente a más antiguo
+            cierresTotales.sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
+            
+            // Inicializar filtrados
+            cierresFiltrados = [...cierresTotales];
+            
+            console.log('Registros filtrados:', cierresFiltrados.length);
+            
+            // Reiniciar paginación
+            reiniciarPaginacion();
+            actualizarResumenTotales();
+            
+        } catch (error) {
+            console.error('Error al cargar historial:', error);
+            document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8">Error al cargar los registros</td></tr>';
+        }
     }
 
     // Filtrar por fechas
@@ -305,11 +383,19 @@
             filtrados = filtrados.filter(c => new Date(c.fecha_cierre) <= fechaHasta);
         }
         
+        console.log('Filtrados:', filtrados.length);
+        
         cierresFiltrados = filtrados;
-        registrosMostrados = 0;
-        document.getElementById('cuerpoHistorial').innerHTML = '';
-        cargarMasRegistros();
-        actualizarResumenTotales(cierresFiltrados);
+        
+        if (cierresFiltrados.length === 0) {
+            limpiarTabla();
+            document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8">No hay registros en el rango de fechas seleccionado</td></tr>';
+            document.getElementById('btnVerMas').style.display = 'none';
+        } else {
+            reiniciarPaginacion();
+        }
+        
+        actualizarResumenTotales();
     }
 
     // Limpiar filtros
@@ -317,10 +403,16 @@
         document.getElementById('fechaDesde').value = '';
         document.getElementById('fechaHasta').value = '';
         cierresFiltrados = [...cierresTotales];
-        registrosMostrados = 0;
-        document.getElementById('cuerpoHistorial').innerHTML = '';
-        cargarMasRegistros();
-        actualizarResumenTotales(cierresFiltrados);
+        
+        if (cierresFiltrados.length === 0) {
+            limpiarTabla();
+            document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8">No hay registros de cierres</td></tr>';
+            document.getElementById('btnVerMas').style.display = 'none';
+        } else {
+            reiniciarPaginacion();
+        }
+        
+        actualizarResumenTotales();
     }
 
     // Ver detalle de un cierre
@@ -427,7 +519,14 @@
     document.addEventListener('DOMContentLoaded', function() {
         actualizarFecha();
         cargarHistorial();
-        document.getElementById('btnVerMas').addEventListener('click', cargarMasRegistros);
+        
+        const btnVerMas = document.getElementById('btnVerMas');
+        if (btnVerMas) {
+            // Remover event listeners previos si existen
+            const nuevoBtn = btnVerMas.cloneNode(true);
+            btnVerMas.parentNode.replaceChild(nuevoBtn, btnVerMas);
+            nuevoBtn.addEventListener('click', cargarMasRegistros);
+        }
     });
 
 

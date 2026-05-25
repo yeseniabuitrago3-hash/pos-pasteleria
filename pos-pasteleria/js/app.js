@@ -626,3 +626,51 @@ window.abrirModalAgregarProducto = abrirModalAgregarProducto;
 window.registrarApertura = registrarApertura;
 window.mostrarAlertaUI = mostrarAlertaUI;
 window.mostrarToast = mostrarToast;
+
+// ==================== INICIALIZAR VERIFICACIÓN DE INTEGRIDAD ====================
+setInterval(() => {
+    verificarIntegridadDatos();
+}, 60000); // Cada minuto
+
+// ==================== REPORTE DIARIO AUTOMÁTICO ====================
+function enviarReporteDiarioAutomatico() {
+    const hoy = new Date().toISOString().split('T')[0];
+    const resumen = getResumenVentasDiario(hoy);
+    
+    if (resumen.tarde) {
+        const texto = `
+📊 REPORTE DIARIO PASTELERÍA
+📅 ${new Date().toLocaleDateString('es-CO')}
+
+🌅 MAÑANA (Dueño):
+- Pasteles: $${(resumen.manana?.total_ventas_pasteles || 0).toLocaleString('es-CO')}
+- Bebidas: $${(resumen.manana?.total_ventas_bebidas || 0).toLocaleString('es-CO')}
+
+🌙 TARDE (Empleada):
+- Pasteles: $${(resumen.tarde?.total_ventas_pasteles || 0).toLocaleString('es-CO')}
+- Bebidas: $${(resumen.tarde?.total_ventas_bebidas || 0).toLocaleString('es-CO')}
+- Nequi: $${(resumen.tarde?.total_nequi || 0).toLocaleString('es-CO')}
+- Diferencia: ${resumen.tarde?.diferencia >= 0 ? '+' : ''}$${Math.abs(resumen.tarde?.diferencia || 0).toLocaleString('es-CO')}
+
+✅ Total día: $${resumen.totalVentas.toLocaleString('es-CO')}
+        `;
+        
+        console.log('📧 [REPORTE DIARIO]', texto);
+        
+        // Aquí se enviaría por email o WhatsApp automáticamente
+        // En producción, integrar con servicio de email/WhatsApp API
+    }
+}
+
+// Ejecutar reporte automático al final del día (18:00)
+function programarReporteDiario() {
+    const ahora = new Date();
+    const horaCierre = new Date();
+    horaCierre.setHours(18, 0, 0, 0);
+    
+    if (ahora >= horaCierre) {
+        enviarReporteDiarioAutomatico();
+    }
+}
+
+setInterval(programarReporteDiario, 3600000); // Verificar cada hora 
