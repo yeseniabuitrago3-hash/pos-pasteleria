@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Análisis Pastelero | POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
     <!-- Google Fonts & Chart.js -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -15,24 +16,24 @@
         }
 
         body {
-            background: #f1e6e6;
+            background: var(--bg-main);
             font-family: 'Inter', sans-serif;
-            color: #2D2A24;
+            color: var(--text-primary);
             padding: 24px 28px;
         }
 
         .container {
-            max-width: 1600px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
         /* ========== HEADER & NAV ========== */
         .header {
-            background: #054480; 
-            border-radius: 32px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+          
             padding: 16px 28px;
             margin-bottom: 28px;
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+            box-shadow: var(--shadow);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -73,43 +74,7 @@
         .estado-abierto { color: #2C7A3B; }
         .estado-cerrado { color: #B84C2C; }
 
-        /* Navegación principal */
-        .main-nav {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            background: #ffffff;
-            padding: 12px 24px;
-            border-radius: 60px;
-            margin-bottom: 30px;
-            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.03);
-            border: 1px solid #FFE2D0;
-        }
-
-        .nav-btn {
-            background: transparent;
-            border: none;
-            padding: 10px 22px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            border-radius: 40px;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            color: #5A4A3A;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .nav-btn:hover {
-            background: #FFF0E4;
-            color: #b1b1b1;
-            transform: translateY(-2px);
-        }
-
-        .nav-btn-active {
-            background: #2867f0;
-            color: white;
-            box-shadow: 0 6px 14px rgba(240, 90, 40, 0.3);
-        }
+        /* Navegación usa estilos globales */
 
         /* ========== TARJETAS DE FILTRO ========== */
         .filtros-card {
@@ -484,7 +449,7 @@
     <!-- HEADER -->
     <header class="header">
         <div class="logo">
-            <h1> POS Pastelería · Análisis</h1>
+            <h1> Pastelería donde Fer - Análisis</h1>
             <span class="fecha" id="fechaActual"></span>
         </div>
         <div class="turno-info">
@@ -535,9 +500,9 @@
 
     <!-- TARJETAS ESTADÍSTICAS -->
     <div class="stats-grid">
-        <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Total Ventas</div><div class="stat-value" id="totalVentasStats">$0</div><div class="stat-sub">período actual</div></div>
-        <div class="stat-card"><div class="stat-icon">📱</div><div class="stat-label">Total Nequi</div><div class="stat-value" id="totalNequiStats">$0</div><div class="stat-sub">transferencias</div></div>
-        <div class="stat-card"><div class="stat-icon">🍰</div><div class="stat-label">Pasteles Vendidos</div><div class="stat-value" id="totalPastelesStats">0</div><div class="stat-sub">unidades</div></div>
+        <div class="stat-card"><div class="stat-icon">💵</div><div class="stat-label">Total Ventas</div><div class="stat-value" id="totalVentasStats">$0</div><div class="stat-sub">período actual</div></div>
+        <div class="stat-card"><div class="stat-icon">📲</div><div class="stat-label">Total Nequi</div><div class="stat-value" id="totalNequiStats">$0</div><div class="stat-sub">transferencias</div></div>
+        <div class="stat-card"><div class="stat-icon">🥧</div><div class="stat-label">Pasteles Vendidos</div><div class="stat-value" id="totalPastelesStats">0</div><div class="stat-sub">unidades</div></div>
         <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">Cierres Realizados</div><div class="stat-value" id="totalCierresStats">0</div><div class="stat-sub">turnos finalizados</div></div>
     </div>
 
@@ -649,11 +614,13 @@
                 fechaFin = new Date(hoy); fechaFin.setHours(23,59,59,999);
                 break;
             case 'semanal':
-                fechaInicio = new Date(hoy); fechaInicio.setDate(hoy.getDate()-7); fechaInicio.setHours(0,0,0,0);
+                // Últimos 7 días: hoy + 6 días anteriores (rango inclusivo)
+                fechaInicio = new Date(hoy); fechaInicio.setDate(hoy.getDate()-6); fechaInicio.setHours(0,0,0,0);
                 fechaFin = new Date(hoy); fechaFin.setHours(23,59,59,999);
                 break;
             case 'mensual':
-                fechaInicio = new Date(hoy); fechaInicio.setDate(hoy.getDate()-30); fechaInicio.setHours(0,0,0,0);
+                // Últimos 30 días: hoy + 29 días anteriores
+                fechaInicio = new Date(hoy); fechaInicio.setDate(hoy.getDate()-29); fechaInicio.setHours(0,0,0,0);
                 fechaFin = new Date(hoy); fechaFin.setHours(23,59,59,999);
                 break;
             case 'anual':
@@ -821,7 +788,8 @@
 
         // Actualizar badge con la hora actual
         const ahora = new Date();
-        document.getElementById('infoBadge').innerHTML = `🍰 Actualizado ${ahora.toLocaleTimeString('es-ES')}`;
+        const periodoText = `${formatearFechaEnEspanol(fechaInicio.toISOString())} — ${formatearFechaEnEspanol(fechaFin.toISOString())}`;
+        document.getElementById('infoBadge').innerHTML = `📅 Período: ${periodoText} • 🍰 Actualizado ${ahora.toLocaleTimeString('es-ES')}`;
     }
 
     // Función auxiliar para escapar HTML y prevenir XSS
@@ -853,6 +821,10 @@
         if (periodoSelect) {
             periodoSelect.addEventListener('change', cambiarPeriodo);
         }
+        const fechaDesde = document.getElementById('fechaDesdePersonal');
+        const fechaHasta = document.getElementById('fechaHastaPersonal');
+        if (fechaDesde) fechaDesde.addEventListener('change', actualizarDashboard);
+        if (fechaHasta) fechaHasta.addEventListener('change', actualizarDashboard);
         
         // Cargar dashboard inicial
         actualizarDashboard();

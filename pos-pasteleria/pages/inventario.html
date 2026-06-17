@@ -20,12 +20,25 @@
             <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
             <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
             <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
-            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
-            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn nav-btn-active">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn">📥 Recibir Pedido</button>
             <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
 </nav>
         
         <div id="alertContainer"></div>
+        
+        <div class="card">
+            <h3>Buscar producto por código</h3>
+            <div class="form-group">
+                <label>Escanea o escribe el código</label>
+                <input type="text" id="scannerInput" placeholder="Escanea o escribe el código y presiona Enter" autocomplete="off">
+                <small>Usa el escáner o ingresa el código manualmente.</small>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                <button class="btn btn-primary" onclick="buscarProductoPorCodigoInventario()">🔎 Buscar producto</button>
+                <span style="color: var(--text-secondary); font-size:0.9rem;">Presiona Enter para escanear o buscar automáticamente.</span>
+            </div>
+        </div>
         
         <div class="card">
             <h3>Productos en stock</h3>
@@ -58,7 +71,115 @@
             <button onclick="window.location.href='../index.html'" class="btn">⬅️ Volver</button>
         </div>
     </div>
-    
+
+    <div id="modalNuevoProducto" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🆕 Nuevo producto</h3>
+                <button class="btn btn-icon" onclick="cerrarModalNuevoProducto()">✖</button>
+            </div>
+            <p class="modal-subtitle">Crea un producto nuevo con precio, stock y proveedor.</p>
+            <div class="form-group">
+                <label>Código</label>
+                <input type="text" id="nuevoProductoCodigo" autofocus>
+            </div>
+            <div class="form-group">
+                <label>Nombre</label>
+                <input type="text" id="nuevoProductoNombre" placeholder="Ej: Caja de macarons">
+            </div>
+            <div class="form-group">
+                <label>Precio</label>
+                <input type="number" id="nuevoProductoPrecio" min="0" step="100" placeholder="Ej: 2500">
+            </div>
+            <div class="form-group">
+                <label>Stock inicial</label>
+                <input type="number" id="nuevoProductoStock" min="0" step="1" placeholder="Ej: 20">
+            </div>
+            <div class="form-group">
+                <label>Stock mínimo</label>
+                <input type="number" id="nuevoProductoMinimo" min="0" step="1" value="5">
+            </div>
+            <div class="form-group">
+                <label>Categoría</label>
+                <input type="text" id="nuevoProductoCategoria" placeholder="Bebidas">
+            </div>
+            <div class="form-group">
+                <label>Proveedor</label>
+                <input type="text" id="nuevoProductoProveedor" placeholder="Ej: Distribuidora">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="guardarNuevoProductoInventario()">Guardar producto</button>
+                <button class="btn btn-outline" onclick="cerrarModalNuevoProducto()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalEditarProducto" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Editar producto</h3>
+                <button class="btn btn-icon" onclick="cerrarModalEditarProducto()">✖</button>
+            </div>
+            <p class="modal-subtitle">Ajusta precio, stock y categoría con más estilo.</p>
+            <input type="hidden" id="editarProductoId">
+            <div class="form-group">
+                <label>Producto</label>
+                <div id="editarProductoNombre" class="modal-strong"></div>
+            </div>
+            <div class="form-group">
+                <label>Precio</label>
+                <input type="number" id="editarProductoPrecio" min="0" step="100" class="money-input">
+            </div>
+            <div class="form-group">
+                <label>Stock actual</label>
+                <input type="number" id="editarProductoStock" min="0" step="1">
+            </div>
+            <div class="form-group">
+                <label>Stock mínimo</label>
+                <input type="number" id="editarProductoMinimo" min="0" step="1">
+            </div>
+            <div class="form-group">
+                <label>Categoría</label>
+                <input type="text" id="editarProductoCategoria">
+            </div>
+            <div class="form-group">
+                <label>Proveedor</label>
+                <input type="text" id="editarProductoProveedor">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="guardarEdicionProducto()">Guardar cambios</button>
+                <button class="btn btn-outline" onclick="cerrarModalEditarProducto()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalRecibirPedido" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📦 Recibir unidades</h3>
+                <button class="btn btn-icon" onclick="cerrarModalRecibirPedido()">✖</button>
+            </div>
+            <p class="modal-subtitle">Registra la llegada de nuevas unidades al inventario.</p>
+            <input type="hidden" id="pedidoProductoId">
+            <div class="form-group">
+                <label>Producto</label>
+                <div id="pedidoProductoNombre" class="modal-strong"></div>
+            </div>
+            <div class="form-group">
+                <label>Cantidad recibida</label>
+                <input type="number" id="pedidoCantidad" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label>Motivo</label>
+                <input type="text" id="pedidoMotivo" placeholder="Ej: Llegada de pedido al almacén">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="confirmarRecepcionPedido()">Registrar entrada</button>
+                <button class="btn btn-outline" onclick="cerrarModalRecibirPedido()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="../js/database.js"></script>
     <script src="../js/app.js"></script>
     <script>

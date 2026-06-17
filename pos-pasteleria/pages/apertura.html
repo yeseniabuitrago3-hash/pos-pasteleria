@@ -6,6 +6,9 @@
     <title>Apertura de Caja - POS Pastelería</title>
     <link rel="stylesheet" href="../css/styles.css">
     <style>
+
+
+
         .money-input {
             font-family: monospace;
             font-size: 1.2rem;
@@ -22,13 +25,14 @@
         .btn-turno {
             flex: 1;
             padding: 20px;
-            border: 2px solid #ddd;
+            border: 2px solid #dddddd;
             border-radius: 16px;
             background: white;
             cursor: pointer;
             transition: all 0.3s ease;
             text-align: center;
         }
+       
         
         .btn-turno:hover {
             transform: translateY(-3px);
@@ -50,7 +54,8 @@
             color: #666;
             font-size: 0.85rem;
         }
-        
+
+       
         .btn-manana { border-left: 4px solid #27ae60; }
         .btn-tarde { border-left: 4px solid #e67e22; }
         
@@ -78,12 +83,12 @@
             <div class="selector-turno">
                 <div class="btn-turno btn-manana" id="btnModoManana" onclick="seleccionarModo('manana')">
                     <h3>🌅 TURNO MAÑANA</h3>
-                    <p>Dueño presente - Solo control de inventario</p>
+                    <p> Solo control de inventario</p>
                     <small>✅ Sin conteo de dinero | ✅ Solo escáner y ventas</small>
                 </div>
                 <div class="btn-turno btn-tarde" id="btnModoTarde" onclick="seleccionarModo('tarde')">
                     <h3>🌙 TURNO TARDE</h3>
-                    <p>Empleada sola - Control TOTAL de dinero</p>
+                    <p> Control TOTAL de dinero</p>
                     <small>⚠️ Con conteo de base | ⚠️ Cierre obligatorio</small>
                 </div>
             </div>
@@ -121,7 +126,7 @@
                     <label>👤 Nombre del responsable</label>
                     <input type="text" id="nombreResponsable" 
                            placeholder="Dueño / Empleada" required>
-                    <small>Quién está operando el turno actual</small>
+                    <small>Quién está trabajando el turno actual</small>
                 </div>
                 
                 <div class="form-group">
@@ -213,6 +218,12 @@
                 alert('❌ Ingresa el nombre del responsable');
                 return;
             }
+
+            const aperturaExistente = getAperturaActual();
+            if (aperturaExistente) {
+                alert('❌ Ya existe un turno abierto. Debes cerrar el turno actual antes de iniciar uno nuevo.');
+                return;
+            }
             
             let billetes = 0, monedas = 0, baseTotal = 0;
             
@@ -243,11 +254,12 @@
                 estado: 'abierta'
             };
             
-            DB.add('aperturas_caja', apertura);
-            sessionStorage.setItem('aperturaActual', JSON.stringify(apertura));
+            const aperturaGuardada = DB.add('aperturas_caja', apertura);
+            localStorage.setItem('pos_apertura_actual_id', aperturaGuardada.id);
+            sessionStorage.setItem('aperturaActual', JSON.stringify(aperturaGuardada));
             
             // Registrar actividad en log
-            registrarActividad('APERTURA', `Turno ${modoSeleccionado} iniciado por ${nombre}`, apertura.id);
+            registrarActividad('APERTURA', `Turno ${modoSeleccionado} iniciado por ${nombre}`, aperturaGuardada.id);
             
             alert(`✅ ¡Apertura registrada con éxito!\n\n📋 Modo: ${modoSeleccionado === 'manana' ? 'MAÑANA' : 'TARDE'}\n👤 Responsable: ${nombre}\n\nRedirigiendo a la página de ventas...`);
             

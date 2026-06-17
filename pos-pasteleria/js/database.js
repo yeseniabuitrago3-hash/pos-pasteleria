@@ -1,5 +1,37 @@
 // ==================== BASE DE DATOS CON LOCALSTORAGE ====================
 
+// ==================== SISTEMA DE USUARIO Y PERMISOS ====================
+const USUARIOS = {
+    // Obtener usuario actual (simulado)
+    getActual: () => {
+        let usuario = localStorage.getItem('usuario_actual');
+        if (!usuario) {
+            // Valor por defecto: Admin
+            usuario = { nombre: 'Admin', rol: 'Admin', id: 1 };
+            localStorage.setItem('usuario_actual', JSON.stringify(usuario));
+        } else {
+            usuario = JSON.parse(usuario);
+        }
+        return usuario;
+    },
+    
+    // Cambiar usuario actual (para pruebas)
+    setActual: (nombre, rol = 'Admin') => {
+        const usuario = { nombre, rol, id: Date.now() };
+        localStorage.setItem('usuario_actual', JSON.stringify(usuario));
+        return usuario;
+    },
+    
+    // Verificar si el usuario tiene un rol específico
+    tieneRol: (rolRequerido) => {
+        const usuario = USUARIOS.getActual();
+        return usuario && usuario.rol === rolRequerido;
+    }
+};
+
+// Inicializar usuario por defecto
+USUARIOS.getActual();
+
 // Inicializar base de datos
 const DB = {
     // Obtener todos los datos de una tabla
@@ -87,7 +119,8 @@ function inicializarBaseDatos() {
         'movimientos_stock',
         'ventas_detalle',      // ← Tabla unificada para análisis
         'alertas_stock', 
-        'alertas_vencidos'
+        'alertas_vencidos',
+        'devoluciones'
     ];
     
     tablasRequeridas.forEach(tabla => {
@@ -114,6 +147,7 @@ function migrarDatosAntiguos() {
     const ventasPasteles = DB.get('ventas_pasteles') || [];
     ventasPasteles.forEach(v => {
         DB.add('ventas_detalle', {
+            ventaId: v.id,
             apertura_id: v.apertura_id,
             producto_id: 0,
             nombre: 'Pastel Tradicional',
@@ -131,6 +165,7 @@ function migrarDatosAntiguos() {
     ventasBebidas.forEach(v => {
         const prod = productos.find(p => p.id === v.producto_id);
         DB.add('ventas_detalle', {
+            ventaId: v.id,
             apertura_id: v.apertura_id,
             producto_id: v.producto_id,
             nombre: prod ? prod.nombre : 'Producto',
@@ -149,8 +184,17 @@ function migrarDatosAntiguos() {
 
 // Obtener apertura actual (turno abierto)
 function getAperturaActual() {
-    const aperturas = DB.get('aperturas_caja');
-    return aperturas.find(a => a.estado === 'abierta');
+    const aperturas = DB.get('aperturas_caja').filter(a => a.estado === 'abierta');
+    if (aperturas.length === 0) return null;
+
+    const aperturaActualId = localStorage.getItem('pos_apertura_actual_id');
+    if (aperturaActualId) {
+        const aperturaPorId = aperturas.find(a => String(a.id) === aperturaActualId);
+        if (aperturaPorId) return aperturaPorId;
+    }
+
+    // Si no hay ID específico, tomar la apertura abierta más reciente
+    return aperturas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0] || null;
 }
 
 // Registrar movimiento de stock
@@ -197,6 +241,7 @@ function venderPastel(cantidad, aperturaId) {
     
     // Registrar en ventas_detalle para análisis
     DB.add('ventas_detalle', {
+        ventaId: venta.id,
         apertura_id: aperturaId,
         producto_id: 0,
         nombre: 'Pastel Tradicional',
@@ -225,6 +270,7 @@ function venderBebida(aperturaId, producto) {
     
     // Registrar en ventas_detalle para análisis
     DB.add('ventas_detalle', {
+        ventaId: venta.id,
         apertura_id: aperturaId,
         producto_id: producto.id,
         nombre: producto.nombre,
@@ -390,6 +436,172 @@ function getTopProductos(fechaInicio, fechaFin) {
     // Convertir a array y ordenar por cantidad descendente
     return Array.from(mapa.values()).sort((a, b) => b.cantidad - a.cantidad);
 }
+
+// ==================== GESTIÓN DE DEVOLUCIONES ====================
+
+/**
+ * Registrar una devolución.
+ * devolucion: { ventaId, aperturaId, productoId, cantidad, restock, motivo, usuario }
+ */
+function registrarDevolucion(devolucion) {
+    // ✅ CORREGIDO: Aceptar productoId 0 (pasteles) - no usar !devolucion.productoId
+    if (!devolucion || devolucion.productoId === undefined || devolucion.productoId === null || !devolucion.cantidad) {
+        throw new Error('Datos incompletos para registrar devolución');
+    }
+
+    const aperturaActual = getAperturaActual();
+    const aperturaId = devolucion.aperturaId || (aperturaActual ? aperturaActual.id : null);
+    if (!aperturaId) throw new Error('No hay apertura asociada a la devolución');
+
+    const producto = DB.findOne('productos', 'id', devolucion.productoId);
+    const cantidad = parseInt(devolucion.cantidad, 10);
+    if (isNaN(cantidad) || cantidad <= 0) throw new Error('Cantidad de devolución inválida');
+
+    const usuario = devolucion.usuario || (aperturaActual ? aperturaActual.responsable : 'sistema');
+
+    // Crear registro de devolución
+    const nuevo = {
+        ventaId: devolucion.ventaId || null,
+        aperturaId: aperturaId,
+        productoId: devolucion.productoId,
+        cantidad: cantidad,
+        restock: !!devolucion.restock,
+        motivo: devolucion.motivo || 'No especificado',
+        usuario: usuario,
+        fecha: new Date().toISOString()
+    };
+
+    // Calcular valor de devolución según precio del producto
+    let precioUnitario = 0;
+    if (producto) precioUnitario = producto.precio || 0;
+    else if (nuevo.productoId === 0) precioUnitario = 2000; // Pastel tradicional por defecto
+    nuevo.valor = precioUnitario * cantidad;
+
+    const creado = DB.add('devoluciones', nuevo);
+
+    // Si se reingresa al stock, registrar movimiento de ENTRADA
+    if (creado.restock) {
+        registrarMovimientoStock(creado.productoId, 'ENTRADA', creado.cantidad, 'DEVOLUCION', creado.usuario);
+    }
+
+    // Actualizar registros de ventas para reflejar cantidad devuelta
+    // Bebidas (ventas_bebidas) - cada registro es 1 unidad
+    let restante = creado.cantidad;
+    const ventasBebidas = DB.get('ventas_bebidas') || [];
+    for (let i = 0; i < ventasBebidas.length && restante > 0; i++) {
+        const v = ventasBebidas[i];
+        if (String(v.apertura_id) !== String(creado.aperturaId)) continue;
+        if (String(v.producto_id) !== String(creado.productoId)) continue;
+        const devuelto = v.cantidadDevuelta || 0;
+        const disponible = (v.cantidad || 1) - devuelto;
+        if (disponible <= 0) continue;
+        const aDevolver = Math.min(disponible, restante);
+        // Marcar en la venta
+        v.cantidadDevuelta = (v.cantidadDevuelta || 0) + aDevolver;
+        v.estadoDevolucion = (v.cantidadDevuelta >= (v.cantidad || 1)) ? 'total' : 'parcial';
+        DB.update('ventas_bebidas', v.id, { cantidadDevuelta: v.cantidadDevuelta, estadoDevolucion: v.estadoDevolucion, subtotal: (v.subtotal || 0) - (precioUnitario * aDevolver) });
+        restante -= aDevolver;
+    }
+
+    // Pasteles (ventas_pasteles)
+    if (restante > 0) {
+        const ventasPasteles = DB.get('ventas_pasteles') || [];
+        for (let i = 0; i < ventasPasteles.length && restante > 0; i++) {
+            const v = ventasPasteles[i];
+            if (String(v.apertura_id) !== String(creado.aperturaId)) continue;
+            const devuelto = v.cantidadDevuelta || 0;
+            const disponible = (v.cantidad || 0) - devuelto;
+            if (disponible <= 0) continue;
+            const aDevolver = Math.min(disponible, restante);
+            v.cantidadDevuelta = (v.cantidadDevuelta || 0) + aDevolver;
+            v.estadoDevolucion = (v.cantidadDevuelta >= (v.cantidad || 0)) ? 'total' : 'parcial';
+            DB.update('ventas_pasteles', v.id, { cantidadDevuelta: v.cantidadDevuelta, estadoDevolucion: v.estadoDevolucion, total: (v.total || 0) - (precioUnitario * aDevolver) });
+            restante -= aDevolver;
+        }
+    }
+
+    // Actualizar ventas_detalle igualmente
+    if (creado) {
+        let rem = creado.cantidad;
+        const detalle = DB.get('ventas_detalle') || [];
+        for (let i = 0; i < detalle.length && rem > 0; i++) {
+            const d = detalle[i];
+            if (String(d.apertura_id) !== String(creado.aperturaId)) continue;
+            if (String(d.producto_id) !== String(creado.productoId) && !(String(creado.productoId) === '0' && d.categoria === 'Pasteles')) continue;
+            const dev = d.cantidadDevuelta || 0;
+            const disponible = (d.cantidad || 0) - dev;
+            if (disponible <= 0) continue;
+            const aDev = Math.min(disponible, rem);
+            d.cantidadDevuelta = (d.cantidadDevuelta || 0) + aDev;
+            d.estadoDevolucion = (d.cantidadDevuelta >= (d.cantidad || 0)) ? 'total' : 'parcial';
+            DB.update('ventas_detalle', d.id, { cantidadDevuelta: d.cantidadDevuelta, estadoDevolucion: d.estadoDevolucion, total: (d.total || 0) - (precioUnitario * aDev) });
+            rem -= aDev;
+        }
+    }
+
+    return creado;
+}
+
+function getDevolucionesPorApertura(aperturaId) {
+    return DB.get('devoluciones').filter(d => String(d.aperturaId) === String(aperturaId));
+}
+
+function revertirDevolucion(devolucionId, usuario) {
+    const devoluciones = DB.get('devoluciones') || [];
+    const idx = devoluciones.findIndex(d => String(d.id) === String(devolucionId));
+    if (idx === -1) return null;
+    const dev = devoluciones[idx];
+    if (dev.anulada) return dev; // ya anulada
+
+    // Si la devolución reingresó stock, ahora debemos sacar esa cantidad
+    if (dev.restock) {
+        registrarMovimientoStock(dev.productoId, 'SALIDA', dev.cantidad, 'REVERTIR_DEVOLUCION', usuario || 'sistema');
+    }
+
+    // Restaurar campos en ventas: quitar cantidadDevuelta
+    let restante = dev.cantidad;
+    const ventasBebidas = DB.get('ventas_bebidas') || [];
+    for (let i = ventasBebidas.length - 1; i >= 0 && restante > 0; i--) {
+        const v = ventasBebidas[i];
+        if (String(v.apertura_id) !== String(dev.aperturaId)) continue;
+        if (String(v.producto_id) !== String(dev.productoId)) continue;
+        const devuelto = v.cantidadDevuelta || 0;
+        if (devuelto <= 0) continue;
+        const a = Math.min(devuelto, restante);
+        v.cantidadDevuelta = devuelto - a;
+        v.estadoDevolucion = v.cantidadDevuelta > 0 ? 'parcial' : 'ninguna';
+        DB.update('ventas_bebidas', v.id, { cantidadDevuelta: v.cantidadDevuelta, estadoDevolucion: v.estadoDevolucion, subtotal: (v.subtotal || 0) + ((DB.findOne('productos','id',v.producto_id)||{precio:0}).precio * a) });
+        restante -= a;
+    }
+
+    if (restante > 0) {
+        const ventasPasteles = DB.get('ventas_pasteles') || [];
+        for (let i = ventasPasteles.length - 1; i >= 0 && restante > 0; i--) {
+            const v = ventasPasteles[i];
+            if (String(v.apertura_id) !== String(dev.aperturaId)) continue;
+            const devuelto = v.cantidadDevuelta || 0;
+            if (devuelto <= 0) continue;
+            const a = Math.min(devuelto, restante);
+            v.cantidadDevuelta = devuelto - a;
+            v.estadoDevolucion = v.cantidadDevuelta > 0 ? 'parcial' : 'ninguna';
+            DB.update('ventas_pasteles', v.id, { cantidadDevuelta: v.cantidadDevuelta, estadoDevolucion: v.estadoDevolucion, total: (v.total || 0) + (2000 * a) });
+            restante -= a;
+        }
+    }
+
+    // Marcar devolución como anulada y añadir auditoría
+    dev.anulada = true;
+    dev.anulada_por = usuario || 'sistema';
+    dev.anulada_fecha = new Date().toISOString();
+    DB.update('devoluciones', dev.id, { anulada: true, anulada_por: dev.anulada_por, anulada_fecha: dev.anulada_fecha });
+
+    return dev;
+}
+
+// Exponer funciones
+window.registrarDevolucion = registrarDevolucion;
+window.getDevolucionesPorApertura = getDevolucionesPorApertura;
+window.revertirDevolucion = revertirDevolucion;
 
 /**
  * Calcula estadísticas resumidas para un período.
@@ -639,3 +851,96 @@ window.getUsuarioActual = getUsuarioActual;
 window.enviarAlertaWhatsApp = enviarAlertaWhatsApp;
 window.getResumenVentasDiario = getResumenVentasDiario;
 window.verificarIntegridadDatos = verificarIntegridadDatos;
+
+
+// ==================== FUNCIÓN PARA HISTORIAL ====================
+
+/**
+ * Obtiene todas las transferencias Nequi de un período
+ * @param {Date} fechaInicio 
+ * @param {Date} fechaFin 
+ * @returns {Array} Transferencias Nequi en el período
+ */
+function getTransferenciasNequiPorRango(fechaInicio, fechaFin) {
+    const transferencias = DB.get('transferencias_nequi') || [];
+    return transferencias.filter(t => {
+        const fecha = new Date(t.fecha);
+        return fecha >= fechaInicio && fecha <= fechaFin;
+    });
+}
+
+/**
+ * Obtiene todas las ventas (pasteles + bebidas) de un período
+ * @param {Date} fechaInicio 
+ * @param {Date} fechaFin 
+ * @returns {Array} Ventas en el período
+ */
+function getVentasPorRango(fechaInicio, fechaFin) {
+    const ventasPasteles = DB.get('ventas_pasteles') || [];
+    const ventasBebidas = DB.get('ventas_bebidas') || [];
+    const productos = DB.get('productos') || [];
+    const devoluciones = DB.get('devoluciones') || [];
+    
+    const resultado = [];
+
+    // Procesar pasteles
+    ventasPasteles.forEach(v => {
+        const fechaVenta = new Date(v.fecha);
+        if (fechaVenta >= fechaInicio && fechaVenta <= fechaFin) {
+            const devuelto = devoluciones
+                .filter(d => d.ventaId === v.id && !d.anulada)
+                .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            const disponible = (v.cantidad || 0) - devuelto;
+            
+            resultado.push({
+                id: v.id,
+                fecha: v.fecha,
+                total: disponible * 2000,
+                tipo: 'pastel',
+                producto_id: 0,
+                nombre: 'Pastel Tradicional',
+                categoria: 'Pasteles',
+                cantidad: disponible,
+                cantidad_original: v.cantidad || 0,
+                devuelto: devuelto,
+                apertura_id: v.apertura_id
+            });
+        }
+    });
+
+    // Procesar bebidas
+    ventasBebidas.forEach(v => {
+        const fechaVenta = new Date(v.fecha);
+        if (fechaVenta >= fechaInicio && fechaVenta <= fechaFin) {
+            const prod = productos.find(p => p.id === v.producto_id);
+            const devuelto = devoluciones
+                .filter(d => d.ventaId === v.id && !d.anulada)
+                .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            const disponible = (v.cantidad || 1) - devuelto;
+            
+            if (disponible > 0) {
+                resultado.push({
+                    id: v.id,
+                    fecha: v.fecha,
+                    total: v.subtotal || 0,
+                    tipo: 'bebida',
+                    producto_id: v.producto_id,
+                    nombre: prod ? prod.nombre : 'Producto desconocido',
+                    categoria: prod ? prod.categoria : 'Otros',
+                    cantidad: disponible,
+                    cantidad_original: v.cantidad || 1,
+                    devuelto: devuelto,
+                    apertura_id: v.apertura_id
+                });
+            }
+        }
+    });
+
+    // Ordenar por fecha descendente
+    resultado.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    return resultado;
+}
+
+// Exportar funciones
+window.getTransferenciasNequiPorRango = getTransferenciasNequiPorRango;
+window.getVentasPorRango = getVentasPorRango;

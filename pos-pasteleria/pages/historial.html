@@ -40,23 +40,6 @@
         .filtros button {
             height: 42px;
         }
-        .resumen-totales {
-            background: linear-gradient(135deg, #8B4513, #5C2E0A);
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 20px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        }
-        .resumen-totales div {
-            text-align: center;
-        }
-        .resumen-totales strong {
-            font-size: 1.8rem;
-            display: block;
-        }
         .diferencia-positiva {
             color: #27ae60;
             font-weight: bold;
@@ -92,6 +75,10 @@
         .detalle-item:last-child {
             border-bottom: none;
         }
+
+       
+    </style>
+
     </style>
 </head>
 >
@@ -110,7 +97,7 @@
             <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
             <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
             <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
-            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn">📥 Recibir Pedido</button>
             <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
 </nav>
 
@@ -127,7 +114,7 @@
                     <input type="date" id="fechaHasta">
                 </div>
                 <button onclick="filtrarHistorial()" class="btn btn-primary">🔍 Filtrar</button>
-                <button onclick="limpiarFiltros()" class="btn">🗑️ Limpiar</button>
+                <button onclick="limpiarFiltros()" class="btn btn-limpiar-filtros">🧹 Limpiar Filtros</button>
                 <button onclick="exportarReporte()" class="btn btn-success">📊 Exportar a Excel</button>
             </div>
         </div>
@@ -181,6 +168,28 @@
         </div>
     </div>
 
+    <!-- Modal de confirmación de eliminación -->
+    <div id="modalEliminar" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>⚠️ Confirmar eliminación</h2>
+                <span class="close-modal" onclick="cerrarModalEliminar()">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 20px; text-align: center;">
+                <p style="font-size: 1.1rem; margin-bottom: 20px; color: #e74c3c;">
+                    ¿Estás seguro de que deseas eliminar este reporte de caja del <strong id="fechaEliminar"></strong>?
+                </p>
+                <p style="color: #666; margin-bottom: 25px;">
+                    <strong>⚠️ Advertencia:</strong> Esta acción es irreversible y eliminará todos los datos asociados a este cierre.
+                </p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button class="btn btn-outline" onclick="cerrarModalEliminar()" style="flex: 1;">Cancelar</button>
+                    <button class="btn btn-danger" onclick="eliminarCierre()" style="flex: 1;">Sí, eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="../js/database.js"></script>
     <script src="../js/scanner.js"></script>
     <script>
@@ -207,6 +216,8 @@ let cierresTotales = [];       // Todos los registros (sin filtrar)
         const diferenciaClase = cierre.diferencia >= 0 ? 'diferencia-positiva' : 'diferencia-negativa';
         const diferenciaTexto = cierre.diferencia >= 0 ? `+$${Math.abs(cierre.diferencia).toLocaleString()}` : `-$${Math.abs(cierre.diferencia).toLocaleString()}`;
         const totalVentasEfectivo = (cierre.total_ventas_pasteles + cierre.total_ventas_bebidas);
+        const usuarioActual = USUARIOS.getActual();
+        const puedeEliminar = usuarioActual && usuarioActual.rol === 'Admin';
         
         const fila = document.createElement('tr');
         fila.innerHTML = `
@@ -217,7 +228,10 @@ let cierresTotales = [];       // Todos los registros (sin filtrar)
             <td>$${cierre.efectivo_esperado.toLocaleString()}</td>
             <td>$${cierre.efectivo_contado.toLocaleString()}</td>
             <td class="${diferenciaClase}">${diferenciaTexto}</td>
-            <td><button class="btn-sm btn-ver" onclick="verDetalle(${cierre.id})">👁️ Ver</button></td>
+            <td>
+                <button class="btn-sm btn-ver" onclick="verDetalle(${cierre.id})">👁️ Ver</button>
+                ${puedeEliminar ? `<button class="btn-sm btn-eliminar" onclick="confirmarEliminar(${cierre.id}, '${fecha.toLocaleDateString('es-ES')}')">🗑️ Eliminar</button>` : ''}
+            </td>
         `;
         tbody.appendChild(fila);
     }
@@ -288,39 +302,10 @@ let cierresTotales = [];       // Todos los registros (sin filtrar)
         cargarMasRegistros();
     }
 
-    // Actualizar resumen de totales (según los datos filtrados)
+    // Actualizar resumen de totales (sin cuadro marrón, porque la información ya está en los reportes)
     function actualizarResumenTotales() {
-        // Crear el resumen si no existe
-        let resumenDiv = document.querySelector('.resumen-totales');
-        if (!resumenDiv) {
-            resumenDiv = document.createElement('div');
-            resumenDiv.className = 'resumen-totales';
-            const card = document.querySelector('.card');
-            if (card) {
-                card.parentNode.insertBefore(resumenDiv, card.nextSibling);
-            }
-            resumenDiv.innerHTML = `
-                <div><span>📊 Total Cierres</span><strong id="totalCierres">0</strong></div>
-                <div><span>💰 Total Ventas</span><strong id="totalVentas">$0</strong></div>
-                <div><span>📱 Total Nequi</span><strong id="totalNequiGlobal">$0</strong></div>
-                <div><span>⚠️ Total Descuadres</span><strong id="totalDescuadres">$0</strong></div>
-            `;
-        }
-        
-        const totalCierres = cierresFiltrados.length;
-        const totalVentas = cierresFiltrados.reduce((sum, c) => sum + (c.total_ventas_pasteles || 0) + (c.total_ventas_bebidas || 0), 0);
-        const totalNequi = cierresFiltrados.reduce((sum, c) => sum + (c.total_nequi || 0), 0);
-        const totalDescuadres = cierresFiltrados.reduce((sum, c) => sum + Math.abs(c.diferencia || 0), 0);
-        
-        const totalCierresElem = document.getElementById('totalCierres');
-        const totalVentasElem = document.getElementById('totalVentas');
-        const totalNequiGlobalElem = document.getElementById('totalNequiGlobal');
-        const totalDescuadresElem = document.getElementById('totalDescuadres');
-        
-        if (totalCierresElem) totalCierresElem.textContent = totalCierres;
-        if (totalVentasElem) totalVentasElem.textContent = `$${totalVentas.toLocaleString()}`;
-        if (totalNequiGlobalElem) totalNequiGlobalElem.textContent = `$${totalNequi.toLocaleString()}`;
-        if (totalDescuadresElem) totalDescuadresElem.textContent = `$${totalDescuadres.toLocaleString()}`;
+        // No mostramos cuadro de resumen adicional en historial.
+        return;
     }
 
     // Cargar historial completo
@@ -423,6 +408,7 @@ let cierresTotales = [];       // Todos los registros (sin filtrar)
         const ventasPasteles = DB.find('ventas_pasteles', 'apertura_id', cierre.apertura_id);
         const ventasBebidas = DB.find('ventas_bebidas', 'apertura_id', cierre.apertura_id);
         const transferencias = DB.find('transferencias_nequi', 'apertura_id', cierre.apertura_id);
+        const devoluciones = getDevolucionesPorApertura ? getDevolucionesPorApertura(cierre.apertura_id) : DB.get('devoluciones').filter(d => String(d.aperturaId) === String(cierre.apertura_id));
         const productos = DB.get('productos');
         
         let html = `
@@ -461,6 +447,20 @@ let cierresTotales = [];       // Todos los registros (sin filtrar)
             });
             html += `</div>`;
         }
+
+        if (devoluciones && devoluciones.length > 0) {
+            html += `<div class="detalle-item"><strong>↺ Devoluciones:</strong><br>`;
+            devoluciones.forEach(d => {
+                const prod = productos.find(p => p.id === d.productoId) || { nombre: (d.productoId === 0 ? 'Pastel Tradicional' : 'Desconocido') };
+                const fechaDev = new Date(d.fecha).toLocaleString();
+                if (d.anulada) {
+                    html += `- ${prod.nombre} x${d.cantidad} • $${(d.valor || 0).toLocaleString()} • ${d.motivo} • Usuario: ${d.usuario} • ${fechaDev} (ANULADA)<br>`;
+                } else {
+                    html += `- ${prod.nombre} x${d.cantidad} • $${(d.valor || 0).toLocaleString()} • ${d.motivo} • Usuario: ${d.usuario} • ${fechaDev} <button class="btn-sm" onclick="anularDevolucion(${d.id})">Anular</button><br>`;
+                }
+            });
+            html += `</div>`;
+        }
         
         if (cierre.observaciones) {
             html += `<div class="detalle-item"><strong>📝 Observaciones:</strong><br>${cierre.observaciones}</div>`;
@@ -472,6 +472,61 @@ let cierresTotales = [];       // Todos los registros (sin filtrar)
 
     function cerrarModalDetalle() {
         document.getElementById('modalDetalle').style.display = 'none';
+    }
+
+    // Variables globales para el modal de eliminación
+    let cierreAEliminar = null;
+
+    // Función para mostrar el modal de confirmación
+    function confirmarEliminar(cierreId, fechaFormato) {
+        cierreAEliminar = cierresFiltrados.find(c => c.id === cierreId);
+        if (!cierreAEliminar) return;
+        
+        document.getElementById('fechaEliminar').textContent = fechaFormato;
+        document.getElementById('modalEliminar').style.display = 'flex';
+        // Auto-focus en botón Cancelar (por defecto enfocado)
+        document.querySelector('.btn-outline').focus();
+    }
+
+    // Función para cerrar el modal de eliminación
+    function cerrarModalEliminar() {
+        document.getElementById('modalEliminar').style.display = 'none';
+        cierreAEliminar = null;
+    }
+
+    // Función para eliminar el cierre
+    function eliminarCierre() {
+        if (!cierreAEliminar) return;
+        
+        try {
+            const cierreId = cierreAEliminar.id;
+            
+            // Eliminar de la base de datos
+            DB.delete('cierres_caja', cierreId);
+            
+            // Actualizar la lista de filtrados
+            cierresFiltrados = cierresFiltrados.filter(c => c.id !== cierreId);
+            cierresTotales = cierresTotales.filter(c => c.id !== cierreId);
+            
+            // Cerrar modal
+            cerrarModalEliminar();
+            
+            // Recargar tabla
+            if (cierresFiltrados.length === 0) {
+                limpiarTabla();
+                document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8">No hay registros de cierres</td></tr>';
+                document.getElementById('btnVerMas').style.display = 'none';
+            } else {
+                reiniciarPaginacion();
+            }
+            
+            // Mostrar notificación de éxito
+            mostrarToast('✅ Reporte de caja eliminado correctamente', 'success');
+            
+        } catch (error) {
+            console.error('Error al eliminar cierre:', error);
+            mostrarToast('❌ Error al eliminar el reporte', 'error');
+        }
     }
 
     // Exportar a CSV
@@ -528,6 +583,89 @@ let cierresTotales = [];       // Todos los registros (sin filtrar)
             nuevoBtn.addEventListener('click', cargarMasRegistros);
         }
     });
+
+    // Función para anular una devolución desde el historial (pide usuario para auditoría)
+    function anularDevolucion(devolucionId) {
+        if (!confirm('¿Confirma anular esta devolución? Esta acción registrará una auditoría.')) return;
+        const usuario = prompt('Ingrese su nombre de usuario para la auditoría (ej: cajero):', 'admin') || 'admin';
+        try {
+            const resultado = revertirDevolucion(devolucionId, usuario);
+            if (!resultado) {
+                alert('No se encontró la devolución o ya está anulada');
+                return;
+            }
+            alert('✅ Devolución anulada y auditoría registrada');
+            // Volver a cargar el modal abierto si existe
+            const modal = document.getElementById('modalDetalle');
+            if (modal && modal.style.display === 'flex') {
+                // Re-renderizar el detalle del cierre actual (buscar cierre mostrado)
+                // Intentamos obtener el cierre abierto actualmente en modal por inspección
+                const detalleContenido = document.getElementById('detalleContenido');
+                if (detalleContenido) {
+                    // Simple estrategia: recargar todo el historial para que los cambios se reflejen
+                    cargarHistorial();
+                    // Cerrar y reabrir modal no trivial aquí; mejor cerrar modal para evitar inconsistencias
+                    modal.style.display = 'none';
+                }
+            } else {
+                cargarHistorial();
+            }
+        } catch (err) {
+            alert('Error al anular devolución: ' + err.message);
+        }
+    }
+
+    // En historial.html - Función para cargar historial
+function cargarHistorialCompleto() {
+    const hoy = new Date();
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    
+    // Obtener ventas
+    const ventas = getVentasPorRango(inicioMes, finMes);
+    // Obtener transferencias Nequi
+    const nequis = getTransferenciasNequiPorRango(inicioMes, finMes);
+    
+    // Mostrar en la tabla
+    mostrarHistorial(ventas, nequis);
+}
+
+function mostrarHistorial(ventas, nequis) {
+    const container = document.getElementById('historialContainer');
+    if (!container) return;
+    
+    let html = '';
+    
+    // Mostrar ventas
+    ventas.forEach(v => {
+        html += `
+            <tr>
+                <td>${new Date(v.fecha).toLocaleString('es-CO')}</td>
+                <td>${v.nombre}</td>
+                <td>${v.cantidad} ud</td>
+                <td>$${v.total.toLocaleString('es-ES')}</td>
+                <td><span class="badge ${v.tipo === 'pastel' ? 'badge-warning' : 'badge-info'}">${v.tipo}</span></td>
+                ${v.devuelto > 0 ? `<td><span class="badge badge-danger">Devuelto: ${v.devuelto}</span></td>` : '<td>-</td>'}
+            </tr>
+        `;
+    });
+    
+    // Mostrar Nequi
+    nequis.forEach(n => {
+        html += `
+            <tr>
+                <td>${new Date(n.fecha).toLocaleString('es-CO')}</td>
+                <td>Nequi - ${n.referencia || 'Sin ref'}</td>
+                <td>-</td>
+                <td>$${n.monto.toLocaleString('es-ES')}</td>
+                <td><span class="badge badge-success">Nequi</span></td>
+                <td>-</td>
+            </tr>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
 
 
     </script>

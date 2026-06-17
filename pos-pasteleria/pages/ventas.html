@@ -6,25 +6,94 @@
     <title>Ventas - POS Pastelería</title>
     <link rel="stylesheet" href="../css/styles.css">
     <style>
-        /* Estilo para inputs de dinero */
         .money-input {
             font-family: monospace;
             font-size: 1rem;
             letter-spacing: 0.5px;
         }
-        
-        /* Resaltar input de escáner */
         .scanner-input {
             font-family: monospace;
             font-size: 1.1rem;
         }
+        .btn-devolucion-active {
+            background-color: #dc3545 !important;
+            color: white !important;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+        .pastel-card, .bebida-card, .nequi-card {
+            background: #f8f9fa;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #4A71C9;
+        }
+        .pastel-card {
+            border-left-color: #f39c12;
+        }
+        .bebida-card {
+            border-left-color: #2ecc71;
+        }
+        .nequi-card {
+            border-left-color: #9b59b6;
+        }
+        .btn-devolver {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .btn-devolver:hover {
+            background: #2ecc71;
+        }
+        .btn-eliminar {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-eliminar:hover {
+            background: #c0392b;
+        }
+        .btn-acciones {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .producto-info {
+            flex: 1;
+        }
+        .producto-precio {
+            font-weight: bold;
+            min-width: 80px;
+            text-align: right;
+        }
+        .devuelto-badge {
+            background: #e67e22;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-left: 5px;
+        }
     </style>
 </head>
-
 <body>
     <div class="container">
         <div class="header">
-            <h1> POS Pastelería - Ventas</h1>
+            <h1>🍰 Pastelería donde Fer - Ventas</h1>
             <div class="fecha" id="fechaActual"></div>
         </div>
 
@@ -35,18 +104,15 @@
             <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
             <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
             <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
-            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn nav-btn-active">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn">📥 Recibir Pedido</button>
             <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
-</nav>
+        </nav>
 
-
-        
-        
         <div id="alertContainer"></div>
-        
-        <div class="dashboard">
+
+        <div class="dashboard ventas-grid">
             <!-- Pasteles -->
-            <div class="card">
+            <section class="card sales-card" id="card-pasteles">
                 <h3>🍰 Pasteles ($2.000 c/u)</h3>
                 <div class="form-group">
                     <label>Cantidad de pasteles:</label>
@@ -55,31 +121,34 @@
                            oninput="validarNumeroEntero(this)"
                            onblur="formatearNumeroEntero(this)">
                 </div>
-                <button onclick="agregarPastel()" class="btn btn-primary">➕ Agregar pastel</button>
+                <button onclick="agregarPastel()" class="btn btn-primary btn-full">➕ Agregar pastel</button>
                 
-                <div style="margin-top:20px;">
+                <div class="section-block">
                     <h4>Vendidos:</h4>
                     <div id="listaPastelesVendidos"></div>
                 </div>
-            </div>
+            </section>
             
-            <!-- Bebidas con escáner -->
-            <div class="card">
+            <!-- Bebidas -->
+            <section class="card sales-card" id="card-bebidas">
                 <h3>🥤 Bebidas / Gaseosas</h3>
                 <div class="form-group">
                     <label>Código del producto:</label>
                     <input type="text" id="scannerInput" class="scanner-input" 
                            placeholder="Escanea el código de barras" autofocus>
                 </div>
+                <div class="form-group">
+                    <button id="btnModoDevolucion" class="btn btn-devolucion btn-full" onclick="toggleModoDevolucion()">🔄 Modo Devolución: OFF</button>
+                </div>
                 
-                <div style="margin-top:20px;">
+                <div class="section-block">
                     <h4>Productos vendidos:</h4>
                     <div id="listaBebidasVendidas"></div>
                 </div>
-            </div>
+            </section>
             
             <!-- Nequi -->
-            <div class="card">
+            <section class="card sales-card" id="card-nequi">
                 <h3>📱 Transferencias Nequi</h3>
                 <div class="form-group">
                     <label>Monto:</label>
@@ -92,26 +161,22 @@
                     <label>Referencia:</label>
                     <input type="text" id="refNequi" placeholder="Opcional">
                 </div>
-                <button onclick="agregarTransferenciaNequi()" class="btn btn-primary">➕ Registrar Nequi</button>
-            </div>
+                <button onclick="agregarTransferenciaNequi()" class="btn btn-primary btn-full">➕ Registrar Nequi</button>
+                
+                <div class="section-block">
+                    <h4>Transferencias registradas:</h4>
+                    <div id="listaTransferenciasNequi"></div>
+                </div>
+            </section>
         </div>
         
         <!-- Totales -->
         <div class="card">
             <h3>💰 Totales del día</h3>
             <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:15px;">
-                <div>
-                    <p><strong>Pasteles:</strong></p>
-                    <p id="totalPasteles">$0</p>
-                </div>
-                <div>
-                    <p><strong>Bebidas efectivo:</strong></p>
-                    <p id="totalBebidas">$0</p>
-                </div>
-                <div>
-                    <p><strong>Total Nequi:</strong></p>
-                    <p id="totalNequi">$0</p>
-                </div>
+                <div><p><strong>Pasteles:</strong></p><p id="totalPasteles">$0</p></div>
+                <div><p><strong>Bebidas efectivo:</strong></p><p id="totalBebidas">$0</p></div>
+                <div><p><strong>Total Nequi:</strong></p><p id="totalNequi">$0</p></div>
             </div>
         </div>
         
@@ -121,59 +186,169 @@
         </div>
     </div>
     
+    <!-- Modal Devolución -->
+    <div id="modalDevolucion" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+        <div style="background:#fff; padding:18px; border-radius:8px; width:320px; box-shadow:0 6px 18px rgba(0,0,0,0.2);">
+            <h3 style="margin-top:0;">↺ Registrar devolución</h3>
+            <div style="margin-bottom:8px;"><strong id="devProductoNombre">Producto</strong></div>
+            <div class="form-group">
+                <label>Cantidad máxima a devolver:</label>
+                <div id="devCantidadMax">0</div>
+            </div>
+            <div class="form-group">
+                <label>Ingrese cantidad a devolver:</label>
+                <input type="number" id="devCantidad" min="1" value="1" style="width:100%; padding:8px;">
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="devRestock" checked> Reingresar al stock</label>
+            </div>
+            <div class="form-group">
+                <label>Motivo:</label>
+                <select id="devMotivo" style="width:100%; padding:8px;">
+                    <option>Cliente</option>
+                    <option>Error de digitación</option>
+                    <option>Producto dañado</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                <button class="btn" onclick="closeDevolucionModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmarDevolucion()">Confirmar devolución</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Nequi -->
+    <div id="modalEliminarNequi" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+        <div style="background:#fff; padding:20px; border-radius:8px; width:340px;">
+            <h3 style="margin-top:0; color:#e74c3c;">⚠️ Eliminar Transferencia</h3>
+            <p>¿Estás seguro de que deseas eliminar esta transferencia Nequi?</p>
+            <div style="background:#f5f5f5; padding:12px; border-radius:6px; margin:15px 0;">
+                <p><strong>Monto:</strong> $<span id="nequiEliminarMonto">0</span></p>
+                <p><strong>Hora:</strong> <span id="nequiEliminarHora">--:--:--</span></p>
+                <p><strong>Referencia:</strong> <span id="nequiEliminarRef">-</span></p>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button class="btn" onclick="closeEliminarNequiModal()">Cancelar</button>
+                <button class="btn" onclick="confirmarEliminarNequi()" style="background:#e74c3c; color:white;">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Venta -->
+    <div id="modalEliminarVenta" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+        <div style="background:#fff; padding:20px; border-radius:8px; width:340px;">
+            <h3 style="margin-top:0; color:#e74c3c;">⚠️ Eliminar Venta</h3>
+            <p>¿Estás seguro de que deseas eliminar esta venta?</p>
+            <div style="background:#f5f5f5; padding:12px; border-radius:6px; margin:15px 0;">
+                <p><strong>Producto:</strong> <span id="ventaEliminarNombre">-</span></p>
+                <p><strong>Cantidad:</strong> <span id="ventaEliminarCantidad">0</span> ud</p>
+                <p><strong>Monto:</strong> $<span id="ventaEliminarMonto">0</span></p>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button class="btn" onclick="closeEliminarVentaModal()">Cancelar</button>
+                <button class="btn" onclick="confirmarEliminarVenta()" style="background:#e74c3c; color:white;">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="../js/database.js"></script>
     <script src="../js/app.js"></script>
     <script>
-        // ==================== FUNCIONES PARA FORMATEAR NÚMEROS ====================
-        
-        // Formatear números con puntos (para montos)
+// ==================== RESETEAR PAGINACIÓN ====================
+function resetearPaginacion() {
+    PAGINACION.pasteles.visible = 8;
+    PAGINACION.bebidas.visible = 8;
+    PAGINACION.nequi.visible = 8;
+}
+
+// Llamar después de agregar/eliminar registros
+// Ejemplo: en agregarPastel(), confirmarEliminarVenta(), etc.
+
+        // ==================== ESTADO DE PAGINACIÓN ====================
+const PAGINACION = {
+    pasteles: { visible: 8, incremento: 5 },
+    bebidas: { visible: 8, incremento: 5 },
+    nequi: { visible: 8, incremento: 5 }
+};
+
+// ==================== FUNCIÓN PARA RENDERIZAR CON PAGINACIÓN ====================
+function renderizarConPaginacion(containerId, items, renderFn, tipo) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    if (!items || items.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const totalItems = items.length;
+    const visible = PAGINACION[tipo].visible;
+    const incremento = PAGINACION[tipo].incremento;
+    const mostrar = Math.min(visible, totalItems);
+    const tieneMas = totalItems > mostrar;
+    
+    // Renderizar los primeros items
+    let html = '';
+    const itemsMostrar = items.slice(0, mostrar);
+    html += itemsMostrar.map(renderFn).join('');
+    
+    // Si hay más items, agregar botón "Ver más"
+    if (tieneMas) {
+        const restantes = totalItems - mostrar;
+        html += `
+            <button class="btn-ver-mas" onclick="cargarMasRegistros('${tipo}', '${containerId}', ${totalItems})">
+                📋 Ver ${Math.min(restantes, incremento)} más <span class="contador">(${restantes} restantes)</span>
+            </button>
+        `;
+    }
+    
+    container.innerHTML = html;
+}
+
+// ==================== CARGAR MÁS REGISTROS ====================
+function cargarMasRegistros(tipo, containerId, totalItems) {
+    const incremento = PAGINACION[tipo].incremento;
+    PAGINACION[tipo].visible += incremento;
+    
+    // Re-renderizar según el tipo
+    if (tipo === 'pasteles') {
+        actualizarListaPasteles();
+    } else if (tipo === 'bebidas') {
+        actualizarListaBebidas();
+    } else if (tipo === 'nequi') {
+        actualizarListaNequi();
+    }
+}
+
+
+        // ==================== FUNCIONES DE FORMATEO ====================
         function formatearNumero(input) {
             let valor = input.value.replace(/[^0-9]/g, '');
-            if (valor === '') {
-                input.value = '';
-                return;
-            }
-            let numero = parseInt(valor, 10);
-            input.value = numero.toLocaleString('es-ES');
+            if (valor === '') { input.value = ''; return; }
+            input.value = parseInt(valor, 10).toLocaleString('es-ES');
         }
         
         function formatearNumeroCompleto(input) {
             let valor = input.value.replace(/[^0-9]/g, '');
-            if (valor === '') {
-                input.value = '';
-                return;
-            }
-            let numero = parseInt(valor, 10);
-            input.value = numero.toLocaleString('es-ES');
+            if (valor === '') { input.value = ''; return; }
+            input.value = parseInt(valor, 10).toLocaleString('es-ES');
         }
         
-        // Para números enteros (cantidad de pasteles) - sin puntos
         function validarNumeroEntero(input) {
             let valor = input.value.replace(/[^0-9]/g, '');
-            if (valor === '') {
-                input.value = '';
-                return;
-            }
-            input.value = parseInt(valor, 10);
+            input.value = valor === '' ? '' : parseInt(valor, 10);
         }
         
         function formatearNumeroEntero(input) {
             let valor = input.value.replace(/[^0-9]/g, '');
-            if (valor === '') {
-                input.value = '';
-                return;
-            }
-            input.value = parseInt(valor, 10);
+            input.value = valor === '' ? '' : parseInt(valor, 10);
         }
         
-        // Obtener valor numérico real (sin puntos)
         function obtenerValorNumerico(inputId) {
             const input = document.getElementById(inputId);
             let valor = input.value.replace(/[^0-9]/g, '');
             return valor === '' ? 0 : parseInt(valor, 10);
         }
-        
-        // ==================== FUNCIONES DE VENTAS ====================
         
         function actualizarFecha() {
             const hoy = new Date();
@@ -181,57 +356,194 @@
             document.getElementById('fechaActual').textContent = hoy.toLocaleDateString('es-ES', opciones);
         }
         
-        function actualizarListaVentas() {
-            const apertura = getAperturaActual();
-            if (!apertura) return;
-            
-            const ventas = DB.find('ventas_pasteles', 'apertura_id', apertura.id);
-            const container = document.getElementById('listaPastelesVendidos');
-            
-            if (container) {
-                if (ventas.length === 0) {
-                    container.innerHTML = '<p>No hay pasteles vendidos</p>';
-                } else {
-                    let html = '<ul style="list-style:none; padding-left:0;">';
-                    ventas.forEach(v => {
-                        const fecha = new Date(v.fecha).toLocaleTimeString();
-                        html += `<li style="padding:5px 0; border-bottom:1px solid #eee;">
-                                    📅 ${fecha} - ${v.cantidad} ud - $${v.total.toLocaleString('es-ES')}
-                                </li>`;
-                    });
-                    html += '</ul>';
-                    container.innerHTML = html;
-                }
-            }
-        }
+        // ==================== ACTUALIZAR LISTA DE PASTELES (CORREGIDA) ====================
+        function actualizarListaPasteles() {
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        document.getElementById('listaPastelesVendidos').innerHTML = '<div class="empty-state">📭 No hay turno activo</div>';
+        return;
+    }
+    
+    const ventasPasteles = DB.get('ventas_pasteles');
+    const devoluciones = DB.get('devoluciones') || [];
+    
+    // Filtrar ventas activas
+    const ventasActivas = ventasPasteles
+        .filter(v => parseInt(v.apertura_id) === parseInt(apertura.id))
+        .map(v => {
+            const devuelto = devoluciones
+                .filter(d => d.ventaId === v.id && !d.anulada)
+                .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            const disponible = (v.cantidad || 0) - devuelto;
+            return { ...v, disponible, devuelto };
+        })
+        .filter(v => v.disponible > 0);
+    
+    if (ventasActivas.length === 0) {
+        document.getElementById('listaPastelesVendidos').innerHTML = '<div class="empty-state">🍰 No hay pasteles vendidos</div>';
+        return;
+    }
+    
+    // ✅ Función para renderizar un item individual
+    const renderPastel = (venta) => `
+        <div class="pastel-card">
+            <div class="producto-info">
+                <strong>${venta.disponible} unidades</strong>
+                ${venta.devuelto > 0 ? `<span class="devuelto-badge">${venta.devuelto} devueltos</span>` : ''}
+                <br>
+                <small>${new Date(venta.fecha).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</small>
+            </div>
+            <div>
+                <div class="producto-precio">$${(venta.disponible * 2000).toLocaleString('es-ES')}</div>
+                <div class="btn-acciones">
+                    <button class="btn-devolver" onclick="openDevolucionModal({
+                        ventaId: ${venta.id},
+                        aperturaId: ${apertura.id},
+                        productoId: 0,
+                        nombre: 'Pastel',
+                        precio: 2000,
+                        cantidadDisponible: ${venta.disponible}
+                    })">🔄 Devolver</button>
+                    <button class="btn-eliminar" onclick="openEliminarVentaModal({
+                        ventaId: ${venta.id},
+                        aperturaId: ${apertura.id},
+                        productoId: 0,
+                        nombre: 'Pastel',
+                        cantidad: ${venta.cantidad},
+                        monto: ${venta.cantidad * 2000}
+                    })">🗑️ Eliminar</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // ✅ Usar renderizado con paginación
+    renderizarConPaginacion(
+        'listaPastelesVendidos',
+        ventasActivas,
+        renderPastel,
+        'pasteles'
+    );
+}
         
+        // ==================== ACTUALIZAR LISTA DE BEBIDAS (CORREGIDA) ====================
         function actualizarListaBebidas() {
-            const apertura = getAperturaActual();
-            if (!apertura) return;
-            
-            const ventas = DB.find('ventas_bebidas', 'apertura_id', apertura.id);
-            const container = document.getElementById('listaBebidasVendidas');
-            const productos = DB.get('productos');
-            
-            if (container) {
-                if (ventas.length === 0) {
-                    container.innerHTML = '<p>No hay bebidas vendidas</p>';
-                } else {
-                    let html = '<ul style="list-style:none; padding-left:0;">';
-                    ventas.forEach(v => {
-                        const producto = productos.find(p => p.id === v.producto_id);
-                        const nombre = producto ? producto.nombre : 'Desconocido';
-                        const fecha = new Date(v.fecha).toLocaleTimeString();
-                        html += `<li style="padding:5px 0; border-bottom:1px solid #eee;">
-                                    📅 ${fecha} - ${nombre} - $${v.subtotal.toLocaleString('es-ES')}
-                                </li>`;
-                    });
-                    html += '</ul>';
-                    container.innerHTML = html;
-                }
-            }
-        }
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        document.getElementById('listaBebidasVendidas').innerHTML = '<div class="empty-state">📭 No hay turno activo</div>';
+        return;
+    }
+    
+    const productos = DB.get('productos');
+    const ventasBebidas = DB.get('ventas_bebidas');
+    const devoluciones = DB.get('devoluciones') || [];
+    
+    const ventasActivas = ventasBebidas
+        .filter(v => parseInt(v.apertura_id) === parseInt(apertura.id))
+        .map(v => {
+            const devuelto = devoluciones
+                .filter(d => d.ventaId === v.id && !d.anulada)
+                .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            const disponible = (v.cantidad || 1) - devuelto;
+            return { ...v, disponible, devuelto };
+        })
+        .filter(v => v.disponible > 0);
+    
+    if (ventasActivas.length === 0) {
+        document.getElementById('listaBebidasVendidas').innerHTML = '<div class="empty-state">🥤 No hay bebidas vendidas</div>';
+        return;
+    }
+    
+    // ✅ Función para renderizar un item individual
+    const renderBebida = (venta) => {
+        const producto = productos.find(p => parseInt(p.id) === parseInt(venta.producto_id));
+        const nombre = producto ? producto.nombre : 'Desconocido';
+        const precio = producto ? producto.precio : 0;
+        return `
+            <div class="bebida-card">
+                <div class="producto-info">
+                    <strong>${nombre}</strong>
+                    ${venta.devuelto > 0 ? `<span class="devuelto-badge">Devuelto</span>` : ''}
+                    <br>
+                    <small>${new Date(venta.fecha).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</small>
+                </div>
+                <div>
+                    <div class="producto-precio">$${venta.subtotal.toLocaleString('es-ES')}</div>
+                    <div class="btn-acciones">
+                        <button class="btn-devolver" onclick="openDevolucionModal({
+                            ventaId: ${venta.id},
+                            aperturaId: ${apertura.id},
+                            productoId: ${venta.producto_id},
+                            nombre: '${nombre}',
+                            precio: ${precio},
+                            cantidadDisponible: ${venta.disponible}
+                        })">🔄 Devolver</button>
+                        <button class="btn-eliminar" onclick="openEliminarVentaModal({
+                            ventaId: ${venta.id},
+                            aperturaId: ${apertura.id},
+                            productoId: ${venta.producto_id},
+                            nombre: '${nombre}',
+                            cantidad: 1,
+                            monto: ${venta.subtotal}
+                        })">🗑️ Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+    
+    // ✅ Usar renderizado con paginación
+    renderizarConPaginacion(
+        'listaBebidasVendidas',
+        ventasActivas,
+        renderBebida,
+        'bebidas'
+    );
+}
         
+        // ==================== ACTUALIZAR LISTA NEQUI ====================
+        function actualizarListaNequi() {
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        document.getElementById('listaTransferenciasNequi').innerHTML = '<div class="empty-state">📭 No hay turno activo</div>';
+        return;
+    }
+    
+    const transferencias = DB.find('transferencias_nequi', 'apertura_id', apertura.id);
+    
+    if (transferencias.length === 0) {
+        document.getElementById('listaTransferenciasNequi').innerHTML = '<div class="empty-state">📱 No hay transferencias registradas</div>';
+        return;
+    }
+    
+    // ✅ Función para renderizar un item individual
+    const renderNequi = (t) => {
+        const fecha = new Date(t.fecha);
+        const hora = fecha.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+        return `
+            <div class="nequi-card">
+                <div class="producto-info">
+                    <strong>$${t.monto.toLocaleString('es-ES')}</strong>
+                    <br>
+                    <small>${hora} | Ref: ${t.referencia || 'Sin referencia'}</small>
+                </div>
+                <div>
+                    <button class="btn-eliminar" onclick="abrirEliminarNequiModal(${t.id}, ${t.monto}, '${hora}', '${t.referencia || 'Sin referencia'}')">🗑️ Eliminar</button>
+                </div>
+            </div>
+        `;
+    };
+    
+    // ✅ Usar renderizado con paginación
+    renderizarConPaginacion(
+        'listaTransferenciasNequi',
+        transferencias,
+        renderNequi,
+        'nequi'
+    );
+}
+        
+        // ==================== ACTUALIZAR TOTALES ====================
         function actualizarTotales() {
             const apertura = getAperturaActual();
             if (!apertura) return;
@@ -241,110 +553,268 @@
             document.getElementById('totalBebidas').textContent = `$${resumen.totalBebidas.toLocaleString('es-ES')}`;
             document.getElementById('totalNequi').textContent = `$${resumen.totalNequi.toLocaleString('es-ES')}`;
         }
+
+       function agregarPastel() {
+    let cantidadInput = document.getElementById('cantidadPasteles');
+    let cantidad = parseInt(cantidadInput.value.replace(/[^0-9]/g, '')) || 0;
+    
+    if (cantidad <= 0) {
+        mostrarMensaje('❌ Ingresa una cantidad válida de pasteles', 'error');
+        return;
+    }
+    
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        mostrarMensaje('❌ No hay un turno abierto', 'error');
+        return;
+    }
+    
+    venderPastel(cantidad, apertura.id);
+    mostrarMensaje(`✅ ${cantidad} pastel(es) vendido(s) por $${(cantidad * 2000).toLocaleString('es-ES')}`, 'success');
+    
+    cantidadInput.value = '';
+    resetearPaginacion(); // ✅ Resetear paginación
+    actualizarListaPasteles();
+    actualizarTotales();
+}
         
-        function agregarPastel() {
-            // Obtener cantidad del input formateado
-            let cantidadInput = document.getElementById('cantidadPasteles');
-            let cantidad = parseInt(cantidadInput.value.replace(/[^0-9]/g, '')) || 0;
+        // ==================== AGREGAR TRANSFERENCIA NEQUI ====================
+       function agregarTransferenciaNequi() {
+    let monto = obtenerValorNumerico('montoNequi');
+    const referencia = document.getElementById('refNequi').value.trim();
+    
+    if (monto <= 0) {
+        mostrarMensaje('❌ Ingresa un monto válido', 'error');
+        return;
+    }
+    
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        mostrarMensaje('❌ No hay un turno abierto', 'error');
+        return;
+    }
+    
+    const transferencia = {
+        monto: monto,
+        referencia: referencia || 'Sin referencia',
+        fecha: new Date().toISOString(),
+        apertura_id: apertura.id,
+        usuario: apertura.responsable || 'sistema'
+    };
+    
+    DB.add('transferencias_nequi', transferencia);
+    mostrarMensaje(`✅ Transferencia Nequi registrada: $${monto.toLocaleString('es-ES')}`, 'success');
+    
+    document.getElementById('montoNequi').value = '';
+    document.getElementById('refNequi').value = '';
+    resetearPaginacion(); // ✅ Resetear paginación
+    actualizarListaNequi();
+    actualizarTotales();
+    
+    if (window.actualizarHistorial) {
+        window.actualizarHistorial();
+    }
+}
+        // ==================== ELIMINAR NEQUI ====================
+        function abrirEliminarNequiModal(nequiId, monto, hora, referencia) {
+            const modal = document.getElementById('modalEliminarNequi');
+            if (!modal) return;
             
-            if (cantidad <= 0) {
-                mostrarMensaje('❌ Ingresa una cantidad válida de pasteles', 'error');
-                return;
-            }
+            document.getElementById('nequiEliminarMonto').textContent = monto.toLocaleString('es-ES');
+            document.getElementById('nequiEliminarHora').textContent = hora;
+            document.getElementById('nequiEliminarRef').textContent = referencia;
+            modal.dataset.nequiId = nequiId;
+            modal.style.display = 'flex';
+        }
+        
+        function closeEliminarNequiModal() {
+            const modal = document.getElementById('modalEliminarNequi');
+            if (modal) modal.style.display = 'none';
+        }
+        
+        function confirmarEliminarNequi() {
+            const modal = document.getElementById('modalEliminarNequi');
+            if (!modal) return;
             
-            const apertura = getAperturaActual();
-            if (!apertura) {
-                mostrarMensaje('❌ No hay un turno abierto. Realiza la apertura primero', 'error');
-                return;
-            }
+            const nequiId = parseInt(modal.dataset.nequiId);
+            DB.delete('transferencias_nequi', nequiId);
+            mostrarMensaje('✅ Transferencia Nequi eliminada correctamente', 'success');
             
-            venderPastel(cantidad, apertura.id);
-            mostrarMensaje(`✅ ${cantidad} pastel(es) vendido(s) por $${(cantidad * 2000).toLocaleString('es-ES')}`, 'success');
-            
-            // Limpiar input
-            cantidadInput.value = '';
-            actualizarListaVentas();
+            actualizarListaNequi();
             actualizarTotales();
-        }
-        
-        function agregarTransferenciaNequi() {
-            // Obtener monto del input formateado
-            let montoInput = document.getElementById('montoNequi');
-            let monto = obtenerValorNumerico('montoNequi');
-            const referencia = document.getElementById('refNequi').value;
             
-            if (monto <= 0) {
-                mostrarMensaje('❌ Ingresa un monto válido', 'error');
-                return;
+            // ✅ También actualizar historial si está abierto
+            if (window.actualizarHistorial) {
+                window.actualizarHistorial();
             }
             
-            const apertura = getAperturaActual();
-            if (!apertura) {
-                mostrarMensaje('❌ No hay un turno abierto', 'error');
-                return;
-            }
-            
-            const transferencia = {
-                apertura_id: apertura.id,
-                monto: monto,
-                referencia: referencia || 'Sin referencia',
-                fecha: new Date().toISOString()
-            };
-            
-            DB.add('transferencias_nequi', transferencia);
-            mostrarMensaje(`✅ Transferencia Nequi por $${monto.toLocaleString('es-ES')} registrada`, 'success');
-            
-            // Limpiar inputs
-            montoInput.value = '';
-            document.getElementById('refNequi').value = '';
-            actualizarTotales();
+            closeEliminarNequiModal();
         }
         
-        // Función para mostrar mensajes temporales
-        function mostrarMensaje(mensaje, tipo) {
-            const container = document.getElementById('alertContainer');
-            if (!container) return;
-            
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${tipo}`;
-            alertDiv.innerHTML = `
-                <span>${mensaje}</span>
-                <button onclick="this.parentElement.remove()" style="float:right; background:none; border:none; cursor:pointer;">✖</button>
-            `;
-            
-            container.appendChild(alertDiv);
-            
-            setTimeout(() => {
-                if (alertDiv.parentElement) alertDiv.remove();
-            }, 3000);
-        }
+        // ==================== DEVOLUCIÓN ====================
+        window.devolucionActiva = false;
         
-        // ==================== CONFIGURAR ESCÁNER ====================
-        function configurarScanner() {
-            const scannerInput = document.getElementById('scannerInput');
-            if (scannerInput) {
-                scannerInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const codigo = e.target.value.trim();
-                        
-                        if (codigo) {
-                            procesarProductoEscaneado(codigo);
-                            e.target.value = '';
-                        }
-                    }
-                });
-                console.log('📷 Escáner configurado');
+        function toggleModoDevolucion() {
+            window.devolucionActiva = !window.devolucionActiva;
+            const btn = document.getElementById('btnModoDevolucion');
+            if (btn) {
+                if (window.devolucionActiva) {
+                    btn.classList.add('btn-devolucion-active');
+                    btn.textContent = '🔁 Modo Devolución: ON';
+                    mostrarMensaje('✅ Modo devolución ACTIVADO', 'success');
+                } else {
+                    btn.classList.remove('btn-devolucion-active');
+                    btn.textContent = '🔄 Modo Devolución: OFF';
+                    mostrarMensaje('❌ Modo devolución desactivado', 'info');
+                }
             }
         }
         
+        function openDevolucionModal(data) {
+            const modal = document.getElementById('modalDevolucion');
+            if (!modal) return;
+            
+            document.getElementById('devProductoNombre').textContent = data.nombre || 'Producto';
+            document.getElementById('devCantidadMax').textContent = data.cantidadDisponible || 1;
+            document.getElementById('devCantidad').value = 1;
+            document.getElementById('devCantidad').max = data.cantidadDisponible || 1;
+            document.getElementById('devRestock').checked = true;
+            document.getElementById('devMotivo').value = 'Cliente';
+            
+            modal.dataset.ventaId = data.ventaId !== undefined && data.ventaId !== null ? data.ventaId : '';
+            modal.dataset.aperturaId = data.aperturaId !== undefined && data.aperturaId !== null ? data.aperturaId : '';
+            modal.dataset.productoId = data.productoId !== undefined && data.productoId !== null ? data.productoId : '';
+            modal.dataset.precio = data.precio !== undefined && data.precio !== null ? data.precio : 0;
+            modal.dataset.nombre = data.nombre || '';
+            modal.dataset.cantidadDisponible = data.cantidadDisponible || 1;
+            
+            modal.style.display = 'flex';
+        }
+        
+        function closeDevolucionModal() {
+            const modal = document.getElementById('modalDevolucion');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function openEliminarVentaModal(data) {
+            const modal = document.getElementById('modalEliminarVenta');
+            if (!modal) return;
+            document.getElementById('ventaEliminarNombre').textContent = data.nombre || 'Producto';
+            document.getElementById('ventaEliminarCantidad').textContent = data.cantidad || 0;
+            document.getElementById('ventaEliminarMonto').textContent = (data.monto || 0).toLocaleString('es-ES');
+            modal.dataset.ventaId = data.ventaId !== undefined && data.ventaId !== null ? data.ventaId : '';
+            modal.dataset.aperturaId = data.aperturaId !== undefined && data.aperturaId !== null ? data.aperturaId : '';
+            modal.dataset.productoId = data.productoId !== undefined && data.productoId !== null ? data.productoId : '';
+            modal.style.display = 'flex';
+        }
+
+        function closeEliminarVentaModal() {
+            const modal = document.getElementById('modalEliminarVenta');
+            if (modal) modal.style.display = 'none';
+        }
+
+       function confirmarEliminarVenta() {
+    const modal = document.getElementById('modalEliminarVenta');
+    if (!modal) return;
+
+    const ventaId = modal.dataset.ventaId ? parseInt(modal.dataset.ventaId, 10) : null;
+    const productoId = modal.dataset.productoId ? parseInt(modal.dataset.productoId, 10) : null;
+    const aperturaId = modal.dataset.aperturaId ? parseInt(modal.dataset.aperturaId, 10) : null;
+    
+    if (!ventaId || productoId === null || !aperturaId) {
+        mostrarMensaje('❌ Datos inválidos para eliminar venta', 'error');
+        return;
+    }
+
+    if (productoId === 0) {
+        const ventasPasteles = DB.get('ventas_pasteles');
+        const indexVenta = ventasPasteles.findIndex(v => parseInt(v.id, 10) === ventaId);
+        if (indexVenta !== -1) {
+            ventasPasteles.splice(indexVenta, 1);
+            DB.set('ventas_pasteles', ventasPasteles);
+        }
+
+        let ventasDetalle = DB.get('ventas_detalle');
+        ventasDetalle = ventasDetalle.filter(vd => {
+            const detalleVentaId = vd.ventaId !== undefined && vd.ventaId !== null ? parseInt(vd.ventaId, 10) : parseInt(vd.id, 10);
+            return !(detalleVentaId === ventaId && vd.producto_id === 0);
+        });
+        DB.set('ventas_detalle', ventasDetalle);
+    } else {
+        DB.delete('ventas_bebidas', ventaId);
+        let ventasDetalle = DB.get('ventas_detalle');
+        ventasDetalle = ventasDetalle.filter(vd => !(parseInt(vd.ventaId, 10) === ventaId && parseInt(vd.producto_id, 10) === productoId));
+        DB.set('ventas_detalle', ventasDetalle);
+    }
+
+    mostrarMensaje('✅ Venta eliminada correctamente', 'success');
+    resetearPaginacion(); // ✅ Resetear paginación
+    actualizarListaPasteles();
+    actualizarListaBebidas();
+    actualizarTotales();
+    closeEliminarVentaModal();
+}
+        // ==================== CONFIRMAR DEVOLUCIÓN (CORREGIDA) ====================
+       
+        function confirmarDevolucion() {
+    const modal = document.getElementById('modalDevolucion');
+    if (!modal) return;
+    
+    const ventaId = modal.dataset.ventaId ? parseInt(modal.dataset.ventaId) : null;
+    const productoId = parseInt(modal.dataset.productoId, 10);
+    const precio = parseFloat(modal.dataset.precio);
+    const nombreProducto = modal.dataset.nombre || 'Producto';
+    const cantidad = parseInt(document.getElementById('devCantidad').value, 10);
+    const restock = document.getElementById('devRestock').checked;
+    const motivo = document.getElementById('devMotivo').value;
+    
+    if (isNaN(productoId) || isNaN(cantidad) || cantidad <= 0) {
+        mostrarMensaje('❌ Datos inválidos', 'error');
+        return;
+    }
+    
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        mostrarMensaje('❌ No hay turno abierto', 'error');
+        closeDevolucionModal();
+        return;
+    }
+    
+    try {
+        const devolucion = registrarDevolucion({
+            ventaId: ventaId,
+            aperturaId: apertura.id,
+            productoId: productoId,
+            cantidad: cantidad,
+            restock: restock,
+            motivo: motivo,
+            usuario: apertura.responsable || 'sistema'
+        });
+        
+        mostrarMensaje(`✅ Devolución: ${cantidad}x ${nombreProducto} por $${(precio * cantidad).toLocaleString('es-ES')}`, 'success');
+        
+        resetearPaginacion(); // ✅ Resetear paginación
+        actualizarListaPasteles();
+        actualizarListaBebidas();
+        actualizarListaNequi();
+        actualizarTotales();
+        closeDevolucionModal();
+        
+        if (window.devolucionActiva) {
+            toggleModoDevolucion();
+        }
+        
+    } catch (err) {
+        mostrarMensaje('❌ Error: ' + err.message, 'error');
+    }
+}
+        // ==================== PROCESAR ESCÁNER ====================
         function procesarProductoEscaneado(codigo) {
             const productos = DB.find('productos', 'codigo_barras', codigo);
             
             if (productos.length === 0) {
-                mostrarMensaje(`❌ Producto con código ${codigo} no encontrado`, 'error');
-                
-                if (confirm(`Producto no registrado.\n¿Desea agregar "${codigo}" al inventario?`)) {
+                mostrarMensaje(`❌ Producto "${codigo}" no encontrado`, 'error');
+                if (confirm(`¿Desea agregar "${codigo}" al inventario?`)) {
                     window.location.href = 'inventario.html';
                 }
                 return;
@@ -353,13 +823,25 @@
             const producto = productos[0];
             
             if (producto.stock_actual <= 0) {
-                mostrarMensaje(`❌ ${producto.nombre} - ¡SIN STOCK!`, 'error');
+                mostrarMensaje(`❌ ${producto.nombre} - SIN STOCK`, 'error');
                 return;
             }
             
             const apertura = getAperturaActual();
             if (!apertura) {
-                mostrarMensaje('❌ No hay un turno abierto', 'error');
+                mostrarMensaje('❌ No hay turno abierto', 'error');
+                return;
+            }
+            
+            if (window.devolucionActiva) {
+                openDevolucionModal({
+                    ventaId: null,
+                    aperturaId: apertura.id,
+                    productoId: producto.id,
+                    nombre: producto.nombre,
+                    precio: producto.precio,
+                    cantidadDisponible: 1
+                });
                 return;
             }
             
@@ -370,90 +852,81 @@
             actualizarTotales();
         }
         
+        // ==================== MOSTRAR MENSAJE ====================
+        function mostrarMensaje(texto, tipo = 'info') {
+            const container = document.getElementById('alertContainer');
+            if (!container) return;
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${tipo}`;
+            alertDiv.innerHTML = `${texto}<button onclick="this.parentElement.remove()" style="float:right; background:none; border:none; cursor:pointer;">✖</button>`;
+            container.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                if (alertDiv.parentElement) alertDiv.remove();
+            }, 3000);
+        }
+        
+        // ==================== CONFIGURAR ESCÁNER ====================
+        function configurarScanner() {
+            const scannerInput = document.getElementById('scannerInput');
+            if (!scannerInput) return;
+            
+            scannerInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const codigo = this.value.trim();
+                    if (codigo) {
+                        procesarProductoEscaneado(codigo);
+                        this.value = '';
+                    }
+                }
+            });
+            
+            // Enfocar automáticamente
+            scannerInput.focus();
+        }
+        
         // ==================== INICIALIZAR ====================
         document.addEventListener('DOMContentLoaded', function() {
             actualizarFecha();
-            actualizarListaVentas();
+            actualizarListaPasteles();
             actualizarListaBebidas();
+            actualizarListaNequi();
             actualizarTotales();
             configurarScanner();
+            
+            // ✅ Escuchar cambios en historial si está abierto
+            window.addEventListener('storage', function(e) {
+                if (e.key && e.key.startsWith('pos_')) {
+                    actualizarListaPasteles();
+                    actualizarListaBebidas();
+                    actualizarListaNequi();
+                    actualizarTotales();
+                }
+            });
         });
         
-        // Hacer funciones globales para los botones
+        // Exponer funciones globales
         window.agregarPastel = agregarPastel;
         window.agregarTransferenciaNequi = agregarTransferenciaNequi;
         window.formatearNumero = formatearNumero;
         window.formatearNumeroCompleto = formatearNumeroCompleto;
         window.validarNumeroEntero = validarNumeroEntero;
         window.formatearNumeroEntero = formatearNumeroEntero;
-
-
-        // ==================== CONFIGURACIÓN POR MODO ====================
-
-function configurarVentasPorModo() {
-    const apertura = getAperturaActual();
-    if (!apertura) return;
-    
-    const modo = apertura.modo;
-    
-    // Ocultar/mostrar sección de Nequi según modo
-    const seccionNequi = document.querySelector('.card:has(h3:contains("Transferencias Nequi"))') || 
-                         document.querySelector('.card:nth-child(3)');
-    
-    if (seccionNequi) {
-        if (modo === 'manana') {
-            seccionNequi.style.display = 'none';
-            console.log('🔒 Modo Mañana: Sección Nequi oculta');
-        } else {
-            seccionNequi.style.display = 'block';
-            console.log('🔓 Modo Tarde: Sección Nequi visible');
-        }
-    }
-    
-    // Mostrar mensaje informativo según modo
-    const modoInfo = document.createElement('div');
-    modoInfo.id = 'modoInfoBanner';
-    modoInfo.style.cssText = `
-        background: ${modo === 'manana' ? '#e8f5e9' : '#fff3e0'};
-        border-left: 4px solid ${modo === 'manana' ? '#27ae60' : '#e67e22'};
-        padding: 12px 16px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-        font-size: 0.9rem;
-    `;
-    
-    if (modo === 'manana') {
-        modoInfo.innerHTML = `
-            🌅 <strong>Modo Mañana Activo</strong><br>
-            Dueño presente - Solo control de inventario.<br>
-            Las transferencias Nequi NO están habilitadas en este turno.
-        `;
-    } else {
-        modoInfo.innerHTML = `
-            🌙 <strong>Modo Tarde Activo</strong><br>
-            Empleada: ${apertura.responsable || 'No especificado'}<br>
-            ⚠️ Registra TODAS las ventas y transferencias Nequi.<br>
-            ⚠️ Al cerrar el turno se contará el dinero y se verificará la caja.
-        `;
-    }
-    
-    // Insertar banner después del header
-    const header = document.querySelector('.header');
-    if (header && !document.getElementById('modoInfoBanner')) {
-        header.insertAdjacentElement('afterend', modoInfo);
-    }
-}
-
-// Llamar a esta función después de cargar los datos
-document.addEventListener('DOMContentLoaded', function() {
-    // ... código existente ...
-    setTimeout(configurarVentasPorModo, 100);
-});
-
-
-
-
-
+        window.toggleModoDevolucion = toggleModoDevolucion;
+        window.openDevolucionModal = openDevolucionModal;
+        window.closeDevolucionModal = closeDevolucionModal;
+        window.confirmarDevolucion = confirmarDevolucion;
+        window.openEliminarVentaModal = openEliminarVentaModal;
+        window.closeEliminarVentaModal = closeEliminarVentaModal;
+        window.confirmarEliminarVenta = confirmarEliminarVenta;
+        window.abrirEliminarNequiModal = abrirEliminarNequiModal;
+        window.closeEliminarNequiModal = closeEliminarNequiModal;
+        window.confirmarEliminarNequi = confirmarEliminarNequi;
+        window.actualizarListaPasteles = actualizarListaPasteles;
+        window.actualizarListaBebidas = actualizarListaBebidas;
+        window.actualizarListaNequi = actualizarListaNequi;
+        window.actualizarTotales = actualizarTotales;
     </script>
 </body>
 </html>

@@ -53,7 +53,50 @@
             gap: 15px;
             margin-top: 25px;
             flex-wrap: wrap;
-            justify-content: center;
+            justify-content: flex-end;
+            align-items: center;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 18px;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+        .dashboard .card {
+            padding: 18px;
+        }
+        #seccionVerificacion {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        #seccionVerificacion .form-group {
+            margin-bottom: 1rem;
+        }
+        #seccionVerificacion p, #seccionVerificacion label {
+            margin: 0 0 8px;
+        }
+        #seccionVerificacion > .form-group:nth-child(1),
+        #seccionVerificacion > .form-group:nth-child(2),
+        #seccionVerificacion > .form-group:nth-child(3) {
+            grid-column: span 2;
+        }
+        #seccionVerificacion textarea {
+            min-height: 120px;
+        }
+        @media (max-width: 900px) {
+            #seccionVerificacion {
+                grid-template-columns: 1fr;
+            }
+            .botones-accion {
+                justify-content: center;
+            }
+        }
+         .nav-btn-active {
+            background: #2867f0;
+            color: white;
+            box-shadow: 0 6px 14px rgba(240, 90, 40, 0.3);
         }
     </style>
 </head>
@@ -61,7 +104,7 @@
     <div class="container">
         <!-- HEADER -->
         <div class="header">
-            <h1>🧁 POS Pastelería - Cierre de Turno</h1>
+            <h1>Pastelería donde Fer- Cierre de Turno</h1>
             <div class="fecha" id="fechaActual"></div>
         </div>
 
@@ -89,13 +132,15 @@
             <div class="dashboard">
                 <div class="card">
                     <h3>Resumen de ventas</h3>
-                    <p>🍰 Pasteles: <strong id="resumenPastelesCierre">$0</strong></p>
-                    <p>🥤 Bebidas: <strong id="resumenBebidasCierre">$0</strong></p>
-                    <p>💰 Total Efectivo: <strong id="totalEfectivoCierre">$0</strong></p>
+                    <p id="linePastelesCierre">🍰 Pasteles: <strong id="resumenPastelesCierre">$0</strong></p>
+                    <p id="lineBebidasCierre">🥤 Bebidas: <strong id="resumenBebidasCierre">$0</strong></p>
+                    <p id="lineDevolucionesCierre">↺ Devoluciones: <strong id="devolucionesCantidad">0</strong></p>
+                    <p id="lineDevolucionesValor">↺ Valor devoluciones: <strong id="devolucionesValor">$0</strong></p>
+                    <p id="rowTotalEfectivo">💰 Total Efectivo: <strong id="totalEfectivoCierre">$0</strong></p>
                     <p id="rowNequiCierre">📱 Total Nequi: <strong id="totalNequiCierre">$0</strong></p>
                 </div>
                 
-                <div class="card">
+                <div class="card" id="baseInicialCard">
                     <h3>Base Inicial</h3>
                     <p>💰 Billetes: <strong id="baseBilletesCierre">$0</strong></p>
                     <p>🪙 Monedas: <strong id="baseMonedasCierre">$0</strong></p>
@@ -117,6 +162,21 @@
                            oninput="formatearNumero(this)"
                            onblur="formatearNumeroCompleto(this)">
                     <small>Ingrese el dinero contado en caja (billetes + monedas)</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Monedas contadas ($):</label>
+                    <input type="text" id="monedasContadas" class="money-input"
+                           placeholder="Ej: 500"
+                           oninput="formatearNumero(this)"
+                           onblur="formatearNumeroCompleto(this)">
+                    <small>Ingrese el total en monedas físicas (valor aproximado en pesos).</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Monedas esperadas:</label>
+                    <p id="monedasEsperadas" style="font-weight:700;">$0</p>
+                    <div id="mensajeMonedas" class="mensaje-diferencia" style="display:none; margin-top:8px;"></div>
                 </div>
                 
                 <div class="form-group">
@@ -202,6 +262,13 @@
             datosCierreActual.aperturaId = apertura.id;
             
             const modoInfo = document.getElementById('modoInfoCierre');
+            const resumen = getResumenVentas(apertura.id);
+            // Obtener devoluciones del turno
+            const devoluciones = getDevolucionesPorApertura(apertura.id) || [];
+            const devolucionesActivas = devoluciones.filter(d => !d.anulada);
+            const cantidadDevoluciones = devolucionesActivas.reduce((s, d) => s + (d.cantidad || 0), 0);
+            const valorDevoluciones = devolucionesActivas.reduce((s, d) => s + (d.valor || 0), 0);
+            
             if (modoActual === 'manana') {
                 modoInfo.className = 'modo-info-cierre modo-manana';
                 modoInfo.innerHTML = `
@@ -211,6 +278,8 @@
                 `;
                 document.getElementById('seccionVerificacion').style.display = 'none';
                 document.getElementById('rowNequiCierre').style.display = 'none';
+                document.getElementById('rowTotalEfectivo').style.display = 'none';
+                document.getElementById('baseInicialCard').style.display = 'none';
             } else {
                 modoInfo.className = 'modo-info-cierre modo-tarde';
                 modoInfo.innerHTML = `
@@ -221,9 +290,9 @@
                 `;
                 document.getElementById('seccionVerificacion').style.display = 'block';
                 document.getElementById('rowNequiCierre').style.display = 'block';
+                document.getElementById('rowTotalEfectivo').style.display = 'block';
+                document.getElementById('baseInicialCard').style.display = 'block';
             }
-            
-            const resumen = getResumenVentas(apertura.id);
             
             datosCierreActual = {
                 totalPasteles: resumen.totalPasteles,
@@ -233,49 +302,119 @@
                 baseBilletes: apertura.base_billetes || 0,
                 baseMonedas: apertura.base_monedas || 0,
                 baseTotal: apertura.base_total || 0,
+                // Regla: Monedas esperadas = base de monedas + resto en monedas de las ventas (se asume que los billetes son múltiplos de $1000)
+                monedasEsperadas: (apertura.base_monedas || 0) + (resumen.totalEfectivo % 1000),
                 efectivoEsperado: (apertura.base_total || 0) + resumen.totalEfectivo,
                 aperturaId: apertura.id,
                 modo: modoActual,
                 responsable: apertura.responsable
             };
             
-            document.getElementById('resumenPastelesCierre').textContent = `$${formatearMostrar(datosCierreActual.totalPasteles)}`;
-            document.getElementById('resumenBebidasCierre').textContent = `$${formatearMostrar(datosCierreActual.totalBebidas)}`;
-            document.getElementById('totalEfectivoCierre').textContent = `$${formatearMostrar(datosCierreActual.totalEfectivo)}`;
-            document.getElementById('totalNequiCierre').textContent = `$${formatearMostrar(datosCierreActual.totalNequi)}`;
+            if (modoActual === 'manana') {
+                document.getElementById('linePastelesCierre').innerHTML = `🍰 Pasteles vendidos: <strong id="resumenPastelesCierre">${resumen.cantidadPasteles}</strong>`;
+                document.getElementById('lineBebidasCierre').innerHTML = `🥤 Bebidas vendidas: <strong id="resumenBebidasCierre">${resumen.cantidadBebidas}</strong>`;
+                document.getElementById('totalEfectivoCierre').textContent = `$0`;
+                document.getElementById('totalNequiCierre').textContent = `$0`;
+                // Mostrar devoluciones como conteo
+                document.getElementById('devolucionesCantidad').textContent = `${cantidadDevoluciones}`;
+                document.getElementById('devolucionesValor').textContent = `$0`;
+            } else {
+                document.getElementById('linePastelesCierre').innerHTML = `🍰 Pasteles: <strong id="resumenPastelesCierre">$${formatearMostrar(datosCierreActual.totalPasteles)}</strong>`;
+                document.getElementById('lineBebidasCierre').innerHTML = `🥤 Bebidas: <strong id="resumenBebidasCierre">$${formatearMostrar(datosCierreActual.totalBebidas)}</strong>`;
+                document.getElementById('totalEfectivoCierre').textContent = `$${formatearMostrar(datosCierreActual.totalEfectivo)}`;
+                document.getElementById('totalNequiCierre').textContent = `$${formatearMostrar(datosCierreActual.totalNequi)}`;
+                document.getElementById('devolucionesCantidad').textContent = `${cantidadDevoluciones}`;
+                document.getElementById('devolucionesValor').textContent = `$${formatearMostrar(valorDevoluciones)}`;
+            }
             document.getElementById('baseBilletesCierre').textContent = `$${formatearMostrar(datosCierreActual.baseBilletes)}`;
             document.getElementById('baseMonedasCierre').textContent = `$${formatearMostrar(datosCierreActual.baseMonedas)}`;
             document.getElementById('baseTotalCierre').textContent = `$${formatearMostrar(datosCierreActual.baseTotal)}`;
             document.getElementById('efectivoEsperado').textContent = `$${formatearMostrar(datosCierreActual.efectivoEsperado)}`;
+            const monedasEsperadasElem = document.getElementById('monedasEsperadas');
+            if (monedasEsperadasElem) monedasEsperadasElem.textContent = `$${formatearMostrar(datosCierreActual.monedasEsperadas)}`;
         }
         
         function calcularDiferencia() {
-            if (modoActual === 'manana') return;
-            
-            const efectivoContado = obtenerValorNumerico('efectivoContado');
-            const efectivoEsperado = datosCierreActual.efectivoEsperado;
-            const diferencia = efectivoContado - efectivoEsperado;
-            const mensajeDiv = document.getElementById('mensajeDiferencia');
-            
-            if (efectivoContado > 0) {
-                mensajeDiv.style.display = 'block';
-                if (diferencia === 0) {
-                    mensajeDiv.style.background = '#d4edda';
-                    mensajeDiv.style.color = '#155724';
-                    mensajeDiv.innerHTML = `<strong>✅ ¡PERFECTO!</strong> Diferencia: $0 - Caja cuadrada.`;
-                } else if (diferencia > 0) {
-                    mensajeDiv.style.background = '#fff3cd';
-                    mensajeDiv.style.color = '#856404';
-                    mensajeDiv.innerHTML = `<strong>⚠️ ¡ATENCIÓN! SOBRANTE EN CAJA</strong><br>Sobrante: <span class="diferencia-positiva">$${formatearMostrar(diferencia)}</span><br>Verifica si hay dinero extra o un error en el conteo.`;
-                } else {
-                    mensajeDiv.style.background = '#f8d7da';
-                    mensajeDiv.style.color = '#721c24';
-                    mensajeDiv.innerHTML = `<strong>⚠️ ¡ATENCIÓN! FALTANTE EN CAJA</strong><br>Faltante: <span class="diferencia-negativa">$${formatearMostrar(Math.abs(diferencia))}</span><br>Verifica si hay dinero faltante o un error en el conteo.`;
-                }
-            } else {
-                mensajeDiv.style.display = 'none';
-            }
+    if (modoActual === 'manana') return;
+    
+    const efectivoContado = obtenerValorNumerico('efectivoContado');
+    const efectivoEsperado = datosCierreActual.efectivoEsperado;
+    const diferencia = efectivoContado - efectivoEsperado;
+    const mensajeDiv = document.getElementById('mensajeDiferencia');
+    
+    // Calcular diferencias específicas de monedas
+    const monedasContadas = obtenerValorNumerico('monedasContadas');
+    const monedasEsperadas = datosCierreActual.monedasEsperadas || 0;
+    const diferenciaMonedas = monedasContadas - monedasEsperadas;
+    const mensajeMonedasDiv = document.getElementById('mensajeMonedas');
+    
+    // Verificar si hay diferencia en monedas
+    let hayDescuadreMonedas = false;
+    if (monedasContadas > 0) {
+        mensajeMonedasDiv.style.display = 'block';
+        if (diferenciaMonedas === 0) {
+            mensajeMonedasDiv.style.background = '#d4edda';
+            mensajeMonedasDiv.style.color = '#155724';
+            mensajeMonedasDiv.innerHTML = `<strong>✅ Monedas cuadradas</strong> Diferencia: $0`;
+        } else if (diferenciaMonedas > 0) {
+            hayDescuadreMonedas = true;
+            mensajeMonedasDiv.style.background = '#fff3cd';
+            mensajeMonedasDiv.style.color = '#856404';
+            mensajeMonedasDiv.innerHTML = `<strong>⚠️ Sobrante en monedas</strong><br>Sobrante: <span class="diferencia-positiva">$${formatearMostrar(diferenciaMonedas)}</span>`;
+        } else {
+            hayDescuadreMonedas = true;
+            mensajeMonedasDiv.style.background = '#f8d7da';
+            mensajeMonedasDiv.style.color = '#721c24';
+            mensajeMonedasDiv.innerHTML = `<strong>⚠️ Faltante en monedas</strong><br>Faltante: <span class="diferencia-negativa">$${formatearMostrar(Math.abs(diferenciaMonedas))}</span>`;
         }
+    } else {
+        mensajeMonedasDiv.style.display = 'none';
+    }
+    
+    // Mostrar mensaje de diferencia TOTAL (considerando ambos)
+    if (efectivoContado > 0) {
+        mensajeDiv.style.display = 'block';
+        
+        // Si hay descuadre en monedas, NO puede ser "perfecto"
+        if (diferencia === 0 && !hayDescuadreMonedas) {
+            mensajeDiv.style.background = '#d4edda';
+            mensajeDiv.style.color = '#155724';
+            mensajeDiv.innerHTML = `<strong>✅ ¡PERFECTO!</strong> Diferencia: $0 - Caja cuadrada.`;
+        } else if (diferencia === 0 && hayDescuadreMonedas) {
+            // Diferencia total 0 pero hay descuadre en monedas
+            mensajeDiv.style.background = '#fff3cd';
+            mensajeDiv.style.color = '#856404';
+            mensajeDiv.innerHTML = `
+                <strong>⚠️ ATENCIÓN: Descuadre en monedas</strong><br>
+                La caja total cuadra (diferencia $0), pero hay descuadre en monedas.<br>
+                <span style="font-size:0.9rem; color:#856404;">
+                    ${diferenciaMonedas > 0 ? `Sobrante en monedas: $${formatearMostrar(diferenciaMonedas)}` : `Faltante en monedas: $${formatearMostrar(Math.abs(diferenciaMonedas))}`}
+                </span>
+            `;
+        } else if (diferencia > 0) {
+            mensajeDiv.style.background = '#fff3cd';
+            mensajeDiv.style.color = '#856404';
+            mensajeDiv.innerHTML = `
+                <strong>⚠️ ¡ATENCIÓN! SOBRANTE EN CAJA</strong><br>
+                Sobrante: <span class="diferencia-positiva">$${formatearMostrar(diferencia)}</span>
+                ${hayDescuadreMonedas ? `<br><span style="font-size:0.9rem;">Además, descuadre en monedas: ${diferenciaMonedas > 0 ? 'sobrante' : 'faltante'} $${formatearMostrar(Math.abs(diferenciaMonedas))}</span>` : ''}
+                <br>Verifica si hay dinero extra o un error en el conteo.
+            `;
+        } else {
+            mensajeDiv.style.background = '#f8d7da';
+            mensajeDiv.style.color = '#721c24';
+            mensajeDiv.innerHTML = `
+                <strong>⚠️ ¡ATENCIÓN! FALTANTE EN CAJA</strong><br>
+                Faltante: <span class="diferencia-negativa">$${formatearMostrar(Math.abs(diferencia))}</span>
+                ${hayDescuadreMonedas ? `<br><span style="font-size:0.9rem;">Además, descuadre en monedas: ${diferenciaMonedas > 0 ? 'sobrante' : 'faltante'} $${formatearMostrar(Math.abs(diferenciaMonedas))}</span>` : ''}
+                <br>Verifica si hay dinero faltante o un error en el conteo.
+            `;
+        }
+    } else {
+        mensajeDiv.style.display = 'none';
+    }
+}
+        
         
         function mostrarMensaje(mensaje, tipo) {
             const mensajeDiv = document.getElementById('mensajeDiferencia');
@@ -300,9 +439,10 @@
             
             if (apertura.modo === 'manana') {
                 // ========== CIERRE SIMPLIFICADO - Modo Mañana ==========
-                const totalVentas = resumen.totalPasteles + resumen.totalBebidas;
+                const cantidadPasteles = resumen.cantidadPasteles;
+                const cantidadBebidas = resumen.cantidadBebidas;
                 
-                const confirmar = confirm(`✅ CIERRE DE TURNO MAÑANA\n\n📊 Resumen:\n👤 Responsable: ${apertura.responsable || 'Dueño'}\n🍰 Pasteles: $${resumen.totalPasteles.toLocaleString('es-CO')}\n🥤 Bebidas: $${resumen.totalBebidas.toLocaleString('es-CO')}\n💰 Total Ventas: $${totalVentas.toLocaleString('es-CO')}\n\n¿Finalizar turno?`);
+                const confirmar = confirm(`✅ CIERRE DE TURNO MAÑANA\n\n📊 Resumen:\n👤 Responsable: ${apertura.responsable || 'Dueño'}\n🍰 Pasteles vendidos: ${cantidadPasteles}\n🥤 Bebidas vendidas: ${cantidadBebidas}\n\n¿Finalizar turno?`);
                 
                 if (!confirmar) return;
                 
@@ -326,7 +466,7 @@
                 DB.update('aperturas_caja', apertura.id, { estado: 'cerrada' });
                 
                 if (typeof registrarActividad === 'function') {
-                    registrarActividad('CIERRE_MANANA', `Turno mañana cerrado. Total ventas: $${totalVentas.toLocaleString('es-CO')}`, apertura.id);
+                    registrarActividad('CIERRE_MANANA', `Turno mañana cerrado. Pasteles: ${cantidadPasteles}, Bebidas: ${cantidadBebidas}`, apertura.id);
                 }
                 
                 alert('✅ Turno mañana finalizado correctamente. Las ventas han sido registradas en el historial.');
@@ -378,6 +518,9 @@
                 efectivo_esperado: efectivoEsperado,
                 efectivo_contado: efectivoContado,
                 diferencia: diferencia,
+                monedas_esperadas: datosCierreActual.monedasEsperadas || 0,
+                monedas_contadas: obtenerValorNumerico('monedasContadas') || 0,
+                diferencia_monedas: (obtenerValorNumerico('monedasContadas') || 0) - (datosCierreActual.monedasEsperadas || 0),
                 observaciones: observaciones || 'Sin observaciones',
                 fecha_cierre: new Date().toISOString()
             };
@@ -385,6 +528,7 @@
             console.log('💾 Guardando cierre tarde:', cierre);
             DB.add('cierres_caja', cierre);
             DB.update('aperturas_caja', apertura.id, { estado: 'cerrada' });
+            localStorage.removeItem('pos_apertura_actual_id');
             
             if (typeof registrarActividad === 'function') {
                 registrarActividad('CIERRE_TARDE', `Turno tarde cerrado. Diferencia: ${diferencia >= 0 ? '+' : ''}$${diferencia.toLocaleString('es-CO')}`, apertura.id);
@@ -411,6 +555,10 @@
             const efectivoContado = document.getElementById('efectivoContado');
             if (efectivoContado) {
                 efectivoContado.addEventListener('input', calcularDiferencia);
+            }
+            const monedasContadasInput = document.getElementById('monedasContadas');
+            if (monedasContadasInput) {
+                monedasContadasInput.addEventListener('input', calcularDiferencia);
             }
         });
         

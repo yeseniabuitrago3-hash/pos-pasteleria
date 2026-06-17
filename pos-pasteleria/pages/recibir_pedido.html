@@ -65,7 +65,7 @@
         <!-- Header con navegación -->
         <header class="header">
             <div class="logo">
-                <h1> POS Pastelería</h1>
+                <h1> Pastelería donde Fer</h1>
                 <span class="fecha" id="fechaActual"></span>
             </div>
             <div class="turno-info">
@@ -162,7 +162,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>📦 ¿Cuántas unidades llegaron?</h2>
-                <span class="close-modal" onclick="cerrarModalCantidad()">&times;</span>
+                <button class="btn btn-icon" onclick="cerrarModalCantidad()">✖</button>
             </div>
             <div id="infoProductoModal" style="margin-bottom: 20px;"></div>
             <div class="form-group">
@@ -174,9 +174,31 @@
                 <input type="text" id="precioCompra" class="money-input" placeholder="Ej: 1.800" 
                        oninput="formatearNumero(this)" onblur="formatearNumeroCompleto(this)">
             </div>
-            <div style="display: flex; gap: 10px;">
+            <div class="modal-actions">
                 <button onclick="confirmarAgregarProducto()" class="btn btn-success">✅ Agregar a factura</button>
                 <button onclick="cerrarModalCantidad()" class="btn btn-outline">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalNuevaFactura" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🆕 Nueva factura</h2>
+                <button class="btn btn-icon" onclick="cerrarModalNuevaFactura()">✖</button>
+            </div>
+            <p class="modal-subtitle">Inicia una factura nueva con número y proveedor.</p>
+            <div class="form-group">
+                <label>Número de factura</label>
+                <input type="text" id="facturaNumeroInput" placeholder="FAC-2026-05-26-001">
+            </div>
+            <div class="form-group">
+                <label>Proveedor</label>
+                <input type="text" id="facturaProveedorInput" placeholder="Ej: Distribuidora" value="Proveedor">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="guardarNuevaFactura()">Iniciar factura</button>
+                <button class="btn btn-outline" onclick="cerrarModalNuevaFactura()">Cancelar</button>
             </div>
         </div>
     </div>
@@ -239,16 +261,30 @@
         }
         
         function iniciarNuevaFactura() {
-            const numero = prompt('Número de factura:', `FAC-${new Date().toISOString().slice(0,10)}-001`);
-            if (!numero) return;
-            const proveedor = prompt('Nombre del proveedor:', 'Proveedor');
-            if (!proveedor) return;
-            
+            document.getElementById('modalNuevaFactura').style.display = 'flex';
+            document.getElementById('facturaNumeroInput').value = `FAC-${new Date().toISOString().slice(0,10)}-001`;
+            document.getElementById('facturaProveedorInput').value = 'Proveedor';
+            document.getElementById('facturaNumeroInput').focus();
+        }
+
+        function cerrarModalNuevaFactura() {
+            document.getElementById('modalNuevaFactura').style.display = 'none';
+        }
+
+        function guardarNuevaFactura() {
+            const numero = document.getElementById('facturaNumeroInput').value.trim();
+            const proveedor = document.getElementById('facturaProveedorInput').value.trim();
+            if (!numero || !proveedor) {
+                mostrarToast('❌ Ingresa número y proveedor', 'error');
+                return;
+            }
+
             facturaActual = { numero, proveedor, productos: [], fecha: new Date().toISOString() };
             document.getElementById('facturaNumero').innerHTML = `<strong>${numero}</strong>`;
             document.getElementById('facturaProveedor').innerHTML = `<strong>${proveedor}</strong>`;
             document.getElementById('listaProductosFactura').innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados. Escanea productos para comenzar.</p>';
             actualizarContadorProductos();
+            cerrarModalNuevaFactura();
             mostrarToast(`✅ Factura ${numero} iniciada`, 'success');
         }
         

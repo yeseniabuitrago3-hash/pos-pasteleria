@@ -170,23 +170,35 @@ function registrarApertura() {
     const billetes = parseInt(billetesInput.value.replace(/[^0-9]/g, '')) || 0;
     const monedas = parseInt(monedasInput.value.replace(/[^0-9]/g, '')) || 0;
     
-    if (billetes === 0 && monedas === 0) {
-        mostrarAlertaUI('❌ Debes ingresar la base inicial de efectivo', 'error');
+    const responsableInput = document.getElementById('nombreResponsable');
+    const responsable = responsableInput ? responsableInput.value.trim() : '';
+    const modo = sessionStorage.getItem('modoTurno') || 'manana';
+    
+    if (!responsable) {
+        mostrarAlertaUI('❌ Ingresa el nombre del responsable del turno', 'error');
         return;
     }
     
-    const baseTotal = billetes + monedas;
+    if (modo === 'tarde' && billetes === 0 && monedas === 0) {
+        mostrarAlertaUI('❌ Debes ingresar la base inicial de efectivo para el turno de tarde', 'error');
+        return;
+    }
+    
+    const baseTotal = modo === 'tarde' ? billetes + monedas : 0;
     
     const apertura = {
-        base_billetes: billetes,
-        base_monedas: monedas,
+        modo,
+        responsable,
+        base_billetes: modo === 'tarde' ? billetes : 0,
+        base_monedas: modo === 'tarde' ? monedas : 0,
         base_total: baseTotal,
         fecha: new Date().toISOString(),
-        usuario: 'cajero',
+        usuario: responsable,
         estado: 'abierta'
     };
     
-    DB.add('aperturas_caja', apertura);
+    const aperturaGuardada = DB.add('aperturas_caja', apertura);
+    localStorage.setItem('pos_apertura_actual_id', aperturaGuardada.id);
     mostrarAlertaUI(`✅ Apertura registrada con éxito. Base: $${baseTotal.toLocaleString()}`, 'success');
     
     // Redirigir a ventas después de 1.5 segundos
@@ -233,7 +245,11 @@ function inicializarScanner() {
             const codigo = this.value.trim();
             
             if (codigo) {
-                procesarProductoEscaneado(codigo);
+                if (window.location.pathname.includes('inventario.html') && typeof buscarProductoPorCodigoInventario === 'function') {
+                    buscarProductoPorCodigoInventario(codigo);
+                } else {
+                    procesarProductoEscaneado(codigo);
+                }
             }
             
             this.value = '';
@@ -505,20 +521,19 @@ function cargarInventario() {
     
     let html = '';
     productos.forEach(p => {
-        const estado = p.stock_actual <= p.stock_minimo ? '⚠️ Bajo' : '✅ OK';
-        const colorEstado = p.stock_actual <= p.stock_minimo ? '#f39c12' : '#27ae60';
+        const estadoClase = p.stock_actual <= p.stock_minimo ? 'badge-warning' : 'badge-success';
         
         html += `
             <tr>
                 <td>${p.codigo_barras}</td>
                 <td>${p.nombre}</td>
                 <td>$${p.precio.toLocaleString()}</td>
-                <td style="background:${colorEstado}; color:white; text-align:center; font-weight:bold;">${p.stock_actual}</td>
+                <td><span class="badge ${estadoClase}">${p.stock_actual}</span></td>
                 <td>${p.stock_minimo}</td>
                 <td>${p.categoria}</td>
-                <td>
-                    <button onclick="editarProducto(${p.id})" class="btn-sm">✏️</button>
-                    <button onclick="recibirPedido(${p.id})" class="btn-sm" style="background:#27ae60;">📦</button>
+                <td class="actions-cell">
+                    <button onclick="abrirModalEditarProducto(${p.id})" class="btn-sm btn-outline" title="Editar precio y stock">✏️</button>
+                    <button onclick="abrirModalRecibirPedido(${p.id})" class="btn-sm btn-success" title="Registrar unidades">📦</button>
                 </td>
             </tr>
         `;
@@ -527,61 +542,155 @@ function cargarInventario() {
     container.innerHTML = html;
 }
 
-function recibirPedido(productoId) {
+function buscarProductoPorCodigoInventario(codigo = '') {
+    const input = document.getElementById('scannerInput');
+    const codigoBuscado = codigo || (input ? input.value.trim() : '');
+    if (!codigoBuscado) {
+        mostrarAlertaUI('❌ Ingresa o escanea un código para buscar', 'error');
+        return;
+    }
+
+    const producto = DB.find('productos', 'codigo_barras', codigoBuscado)[0];
+    if (!producto) {
+        mostrarAlertaUI(`❌ Producto con código ${codigoBuscado} no encontrado`, 'error');
+        if (input) input.value = '';
+        return;
+    }
+
+    mostrarAlertaUI(`✅ Producto encontrado: ${producto.nombre} — Stock: ${producto.stock_actual}`, 'success');
+    if (input) input.value = '';
+    abrirModalEditarProducto(producto.id);
+}
+
+function abrirModalEditarProducto(productoId) {
+    const producto = DB.findOne('productos', 'id', productoId);
+    if (!producto) return;
+
+    document.getElementById('editarProductoId').value = producto.id;
+    document.getElementById('editarProductoNombre').textContent = producto.nombre;
+    document.getElementById('editarProductoPrecio').value = producto.precio;
+    document.getElementById('editarProductoStock').value = producto.stock_actual;
+    document.getElementById('editarProductoMinimo').value = producto.stock_minimo;
+    document.getElementById('editarProductoCategoria').value = producto.categoria || '';
+    document.getElementById('editarProductoProveedor').value = producto.proveedor || '';
+    document.getElementById('modalEditarProducto').style.display = 'flex';
+}
+
+function cerrarModalEditarProducto() {
+    const modal = document.getElementById('modalEditarProducto');
+    if (modal) modal.style.display = 'none';
+}
+
+function guardarEdicionProducto() {
+    const id = parseInt(document.getElementById('editarProductoId').value, 10);
+    const precio = parseFloat(document.getElementById('editarProductoPrecio').value) || 0;
+    const stock = parseInt(document.getElementById('editarProductoStock').value, 10) || 0;
+    const minimo = parseInt(document.getElementById('editarProductoMinimo').value, 10) || 0;
+    const categoria = document.getElementById('editarProductoCategoria').value.trim();
+    const proveedor = document.getElementById('editarProductoProveedor').value.trim();
+    const producto = DB.findOne('productos', 'id', id);
+    if (!producto) return;
+
+    const stockCambio = stock - producto.stock_actual;
+    if (stockCambio !== 0) {
+        registrarMovimientoStock(id, stockCambio > 0 ? 'ENTRADA' : 'SALIDA', Math.abs(stockCambio), 'AJUSTE_MANUAL', 'admin');
+    }
+
+    DB.update('productos', id, {
+        precio,
+        stock_actual: stock,
+        stock_minimo: minimo,
+        categoria: categoria || producto.categoria,
+        proveedor: proveedor || producto.proveedor
+    });
+
+    mostrarAlertaUI(`✅ ${producto.nombre} actualizado`, 'success');
+    cargarInventario();
+    cerrarModalEditarProducto();
+}
+
+function abrirModalRecibirPedido(productoId) {
     const producto = DB.findOne('productos', 'id', productoId);
     if (!producto) return;
     
-    const cantidad = prompt(`¿Cuántas unidades de "${producto.nombre}" llegaron?`, "0");
-    if (!cantidad || parseInt(cantidad) <= 0) return;
-    
-    const cantidadInt = parseInt(cantidad);
-    
-    registrarMovimientoStock(productoId, 'ENTRADA', cantidadInt, 'RECIBO_PEDIDO', 'admin');
-    mostrarAlertaUI(`✅ Pedido recibido: ${cantidadInt} unidades de ${producto.nombre}. Nuevo stock: ${producto.stock_actual + cantidadInt}`, 'success');
-    
+    document.getElementById('pedidoProductoId').value = producto.id;
+    document.getElementById('pedidoProductoNombre').textContent = producto.nombre;
+    document.getElementById('pedidoCantidad').value = 1;
+    document.getElementById('pedidoMotivo').value = '';
+    document.getElementById('modalRecibirPedido').style.display = 'flex';
+}
+
+function cerrarModalRecibirPedido() {
+    const modal = document.getElementById('modalRecibirPedido');
+    if (modal) modal.style.display = 'none';
+}
+
+function confirmarRecepcionPedido() {
+    const id = parseInt(document.getElementById('pedidoProductoId').value, 10);
+    const cantidad = parseInt(document.getElementById('pedidoCantidad').value, 10) || 0;
+    const motivo = document.getElementById('pedidoMotivo').value.trim() || 'Pedido recibido';
+    const producto = DB.findOne('productos', 'id', id);
+    if (!producto) return;
+
+    if (cantidad <= 0) {
+        mostrarAlertaUI('❌ Ingresa una cantidad válida', 'error');
+        return;
+    }
+
+    registrarMovimientoStock(id, 'ENTRADA', cantidad, 'RECIBO_PEDIDO', 'admin');
+    mostrarAlertaUI(`✅ ${cantidad} unidades de ${producto.nombre} agregadas al inventario`, 'success');
     cargarInventario();
+    cerrarModalRecibirPedido();
+}
+
+function recibirPedido(productoId) {
+    abrirModalRecibirPedido(productoId);
 }
 
 function editarProducto(id) {
-    const producto = DB.findOne('productos', 'id', id);
-    if (!producto) return;
-    
-    const nuevoPrecio = prompt('Nuevo precio:', producto.precio);
-    if (nuevoPrecio !== null && !isNaN(parseFloat(nuevoPrecio))) {
-        producto.precio = parseFloat(nuevoPrecio);
-        DB.update('productos', id, { precio: producto.precio });
-        mostrarAlertaUI(`✅ Precio de ${producto.nombre} actualizado a $${producto.precio.toLocaleString()}`, 'success');
-    }
-    
-    const nuevoStock = prompt('Nuevo stock:', producto.stock_actual);
-    if (nuevoStock !== null && !isNaN(parseInt(nuevoStock))) {
-        const stockNuevo = parseInt(nuevoStock);
-        registrarMovimientoStock(id, stockNuevo > producto.stock_actual ? 'ENTRADA' : 'SALIDA', Math.abs(stockNuevo - producto.stock_actual), 'AJUSTE_MANUAL', 'admin');
-        mostrarAlertaUI(`✅ Stock de ${producto.nombre} actualizado a ${stockNuevo}`, 'success');
-    }
-    
-    cargarInventario();
+    abrirModalEditarProducto(id);
 }
 
 function abrirModalAgregarProducto(codigoPrefilled = '') {
-    const nombre = prompt('Nombre del producto:');
-    if (!nombre) return;
-    
-    const precio = parseInt(prompt('Precio del producto:', '0'));
-    if (isNaN(precio) || precio <= 0) {
-        mostrarAlertaUI('❌ Precio inválido', 'error');
+    const modal = document.getElementById('modalNuevoProducto');
+    if (!modal) return;
+
+    document.getElementById('nuevoProductoCodigo').value = codigoPrefilled || `COD${Date.now()}`;
+    document.getElementById('nuevoProductoNombre').value = '';
+    document.getElementById('nuevoProductoPrecio').value = '';
+    document.getElementById('nuevoProductoStock').value = '';
+    document.getElementById('nuevoProductoMinimo').value = 5;
+    document.getElementById('nuevoProductoCategoria').value = 'Bebidas';
+    document.getElementById('nuevoProductoProveedor').value = '';
+    modal.style.display = 'flex';
+    // Cambiar foco al campo CÓDIGO para permitir entrada de escáner
+    document.getElementById('nuevoProductoCodigo').focus();
+}
+
+function cerrarModalNuevoProducto() {
+    const modal = document.getElementById('modalNuevoProducto');
+    if (modal) modal.style.display = 'none';
+}
+
+function guardarNuevoProductoInventario() {
+    const codigo = document.getElementById('nuevoProductoCodigo').value.trim();
+    const nombre = document.getElementById('nuevoProductoNombre').value.trim();
+    const precio = parseFloat(document.getElementById('nuevoProductoPrecio').value) || 0;
+    const stock = parseInt(document.getElementById('nuevoProductoStock').value, 10) || 0;
+    const minimo = parseInt(document.getElementById('nuevoProductoMinimo').value, 10) || 5;
+    const categoria = document.getElementById('nuevoProductoCategoria').value.trim() || 'Otros';
+    const proveedor = document.getElementById('nuevoProductoProveedor').value.trim() || 'Proveedor';
+
+    if (!codigo || !nombre || precio <= 0) {
+        mostrarAlertaUI('❌ Completa todos los campos obligatorios', 'error');
         return;
     }
-    
-    const stock = parseInt(prompt('Stock inicial:', '0')) || 0;
-    const minimo = parseInt(prompt('Stock mínimo para alerta:', '5')) || 5;
-    const codigo = codigoPrefilled || prompt('Código de barras:', `COD${Date.now()}`);
-    const categoria = prompt('Categoría (Pasteles/Bebidas/Otros):', 'Otros');
-    
+
     try {
-        agregarProducto(codigo, nombre, precio, stock, minimo, categoria);
-        mostrarAlertaUI(`✅ Producto "${nombre}" agregado correctamente`, 'success');
+        agregarProducto(codigo, nombre, precio, stock, minimo, categoria, proveedor);
+        mostrarAlertaUI(`✅ Producto ${nombre} agregado correctamente`, 'success');
         cargarInventario();
+        cerrarModalNuevoProducto();
     } catch (error) {
         mostrarAlertaUI(error.message, 'error');
     }
@@ -622,6 +731,7 @@ window.calcularDiferencia = calcularDiferencia;
 window.cargarInventario = cargarInventario;
 window.recibirPedido = recibirPedido;
 window.editarProducto = editarProducto;
+window.buscarProductoPorCodigoInventario = buscarProductoPorCodigoInventario;
 window.abrirModalAgregarProducto = abrirModalAgregarProducto;
 window.registrarApertura = registrarApertura;
 window.mostrarAlertaUI = mostrarAlertaUI;
