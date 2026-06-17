@@ -1,5 +1,6 @@
-// ==================== BASE DE DATOS CON LOCALSTORAGE ====================
+// ==================== CONEXIÓN A MYSQL VÍA API ====================
 
+<<<<<<< HEAD
 // ==================== SISTEMA DE USUARIO Y PERMISOS ====================
 const USUARIOS = {
     // Obtener usuario actual (simulado)
@@ -39,76 +40,25 @@ const DB = {
         const data = localStorage.getItem(`pos_${tabla}`);
         return data ? JSON.parse(data) : [];
     },
+=======
+const API_URL = 'http://localhost/pos-pasteleria/api.php';
+
+async function callAPI(action, data = null) {
+    let url = `${API_URL}?action=${action}`;
+>>>>>>> 5e22d69c946347c79fa5ce3e53dbab5a30c9f478
     
-    // Guardar datos en una tabla
-    set: (tabla, datos) => {
-        localStorage.setItem(`pos_${tabla}`, JSON.stringify(datos));
-    },
-    
-    // Agregar un registro
-    add: (tabla, registro) => {
-        const datos = DB.get(tabla);
-        registro.id = Date.now();
-        registro.fecha_creacion = new Date().toISOString();
-        datos.push(registro);
-        DB.set(tabla, datos);
-        return registro;
-    },
-    
-    // Actualizar un registro
-    update: (tabla, id, nuevosDatos) => {
-        const datos = DB.get(tabla);
-        const index = datos.findIndex(d => d.id === id);
-        if (index !== -1) {
-            datos[index] = { ...datos[index], ...nuevosDatos };
-            DB.set(tabla, datos);
-            return datos[index];
+    const options = {
+        method: data ? 'POST' : 'GET',
+        headers: {
+            'Content-Type': 'application/json',
         }
-        return null;
-    },
+    };
     
-    // Eliminar un registro
-    delete: (tabla, id) => {
-        let datos = DB.get(tabla);
-        datos = datos.filter(d => d.id !== id);
-        DB.set(tabla, datos);
-    },
-    
-    // Buscar por campo (retorna ARRAY)
-    find: (tabla, campo, valor) => {
-        const datos = DB.get(tabla);
-        return datos.filter(d => d[campo] === valor);
-    },
-    
-    // Buscar UNO por campo (retorna el primer elemento o null)
-    findOne: (tabla, campo, valor) => {
-        const datos = DB.get(tabla);
-        return datos.find(d => d[campo] === valor) || null;
-    },
-    
-    // Obtener el último registro
-    last: (tabla) => {
-        const datos = DB.get(tabla);
-        return datos.length > 0 ? datos[datos.length - 1] : null;
-    }
-};
-
-// Productos de ejemplo
-const productosPorDefecto = [
-    { id: 1, codigo_barras: "7702123456789", nombre: "Coca-Cola 400ml", precio: 2500, stock_actual: 10, stock_minimo: 5, categoria: "Bebidas", proveedor: "Coca-Cola", costo_compra: 1800 },
-    { id: 2, codigo_barras: "7702987654321", nombre: "Pepsi 400ml", precio: 2400, stock_actual: 8, stock_minimo: 5, categoria: "Bebidas", proveedor: "Pepsi", costo_compra: 1700 },
-    { id: 3, codigo_barras: "7702111122223", nombre: "Agua Cristal 600ml", precio: 2000, stock_actual: 3, stock_minimo: 8, categoria: "Bebidas", proveedor: "Cristal", costo_compra: 1400 },
-    { id: 4, codigo_barras: "7702333344445", nombre: "Jugo Hit Manzana", precio: 2200, stock_actual: 5, stock_minimo: 5, categoria: "Bebidas", proveedor: "Postobón", costo_compra: 1600 }
-];
-
-// Inicializar TODAS las tablas
-function inicializarBaseDatos() {
-    // Tabla de productos
-    if (DB.get('productos').length === 0) {
-        DB.set('productos', productosPorDefecto);
-        console.log('✅ Productos inicializados');
+    if (data) {
+        options.body = JSON.stringify(data);
     }
     
+<<<<<<< HEAD
     // Tablas que deben existir siempre
     const tablasRequeridas = [
         'aperturas_caja', 
@@ -122,12 +72,100 @@ function inicializarBaseDatos() {
         'alertas_vencidos',
         'devoluciones'
     ];
+=======
+    try {
+        const response = await fetch(url, options);
+        const result = await response.json();
+        console.log(`✅ API ${action}:`, result);
+        return result;
+    } catch (error) {
+        console.error(`❌ Error en API (${action}):`, error);
+        return { error: error.message };
+    }
+}
+
+// ==================== PRODUCTOS ====================
+
+async function getProductos() {
+    const productos = await callAPI('get_productos');
+    return Array.isArray(productos) ? productos : [];
+}
+
+async function getProductoByCodigo(codigo) {
+    return await callAPI(`get_producto_by_codigo&codigo=${codigo}`);
+}
+
+// ==================== APERTURA Y CIERRE DE CAJA ====================
+
+async function getAperturaActual() {
+    const result = await callAPI('get_apertura_actual');
+    return result && !result.error ? result : null;
+}
+
+async function abrirCaja(usuario, montoInicial) {
+    return await callAPI('abrir_caja', {
+        usuario: usuario,
+        monto_inicial: montoInicial
+    });
+}
+
+async function cerrarCaja(aperturaId, totalPasteles, totalBebidas, totalNequi) {
+    return await callAPI('cerrar_caja', {
+        apertura_id: aperturaId,
+        total_pasteles: totalPasteles,
+        total_bebidas: totalBebidas,
+        total_nequi: totalNequi
+    });
+}
+
+// ==================== VENTAS ====================
+
+async function registrarVenta(venta) {
+    return await callAPI('registrar_venta', venta);
+}
+
+async function venderPastel(aperturaId, cantidad, usuario = 'cajero') {
+    return await callAPI('vender_pastel', {
+        apertura_id: aperturaId,
+        cantidad: cantidad,
+        usuario: usuario
+    });
+}
+
+async function getResumenVentas(aperturaId) {
+    const result = await callAPI(`get_resumen_ventas&apertura_id=${aperturaId}`);
+    return result || { totalPasteles: 0, totalBebidas: 0, totalEfectivo: 0, totalNequi: 0 };
+}
+
+// ==================== MOVIMIENTOS ====================
+
+async function getMovimientosStock() {
+    const movimientos = await callAPI('get_movimientos_stock');
+    return Array.isArray(movimientos) ? movimientos : [];
+}
+
+// ==================== ALERTAS ====================
+
+async function getAlertasStock() {
+    const alertas = await callAPI('get_alertas_stock');
+    return Array.isArray(alertas) ? alertas : [];
+}
+
+// ==================== INICIALIZACIÓN ====================
+
+async function inicializarSistema() {
+    console.log('🔄 Conectando a MySQL...');
+>>>>>>> 5e22d69c946347c79fa5ce3e53dbab5a30c9f478
     
-    tablasRequeridas.forEach(tabla => {
-        if (DB.get(tabla).length === 0) {
-            DB.set(tabla, []);
-            console.log(`✅ Tabla ${tabla} inicializada`);
+    try {
+        const productos = await getProductos();
+        console.log(`📦 ${productos.length} productos cargados desde MySQL`);
+        
+        const alertas = await getAlertasStock();
+        if (alertas.length > 0) {
+            console.log(`⚠️ ${alertas.length} alertas de stock activas`);
         }
+<<<<<<< HEAD
     });
     
     // Migrar datos antiguos si es necesario
@@ -312,44 +350,39 @@ function agregarProducto(codigo, nombre, precio, stockInicial, stockMinimo, cate
     const existente = DB.findOne('productos', 'codigo_barras', codigo);
     if (existente) {
         throw new Error(`El producto con código ${codigo} ya existe: ${existente.nombre}`);
+=======
+        
+        const apertura = await getAperturaActual();
+        if (apertura) {
+            console.log(`✅ Caja abierta por: ${apertura.usuario}`);
+        } else {
+            console.log('⚠️ No hay caja abierta');
+        }
+        
+        console.log('✅ Sistema conectado a MySQL correctamente');
+    } catch (error) {
+        console.error('❌ Error conectando a MySQL:', error);
+>>>>>>> 5e22d69c946347c79fa5ce3e53dbab5a30c9f478
     }
-    
-    const nuevoProducto = {
-        id: Date.now(),
-        codigo_barras: codigo,
-        nombre: nombre,
-        precio: parseFloat(precio),
-        stock_actual: parseInt(stockInicial) || 0,
-        stock_minimo: parseInt(stockMinimo) || 3,
-        categoria: categoria || 'Bebidas',
-        proveedor: proveedor || 'No especificado',
-        costo_compra: costo ? parseFloat(costo) : null,
-        fecha_registro: new Date().toISOString(),
-        activo: true
-    };
-    
-    DB.add('productos', nuevoProducto);
-    
-    if (stockInicial > 0) {
-        registrarMovimientoStock(nuevoProducto.id, 'ENTRADA', stockInicial, 'PRODUCTO_NUEVO', 'sistema');
-    }
-    
-    return nuevoProducto;
 }
 
-// Inicializar base de datos al cargar
-inicializarBaseDatos();
-
 // Hacer funciones globales
-window.DB = DB;
+window.getProductos = getProductos;
+window.getProductoByCodigo = getProductoByCodigo;
 window.getAperturaActual = getAperturaActual;
+window.abrirCaja = abrirCaja;
+window.cerrarCaja = cerrarCaja;
+window.registrarVenta = registrarVenta;
 window.venderPastel = venderPastel;
-window.venderBebida = venderBebida;
 window.getResumenVentas = getResumenVentas;
-window.agregarProducto = agregarProducto;
-window.registrarMovimientoStock = registrarMovimientoStock;
+window.getMovimientosStock = getMovimientosStock;
+window.getAlertasStock = getAlertasStock;
+window.inicializarSistema = inicializarSistema;
 
+// Inicializar automáticamente
+document.addEventListener('DOMContentLoaded', inicializarSistema);
 
+<<<<<<< Updated upstream
 
 
 // ==================== FUNCIONES PARA ANÁLISIS Y REPORTES ====================
