@@ -2111,3 +2111,61 @@ td:last-child, th:last-child {
     font-size: 0.7rem;
     margin-left: 8px;
 }
+/* ===== ESTILOS PARA PAGINACIÓN ===== */
+.btn-ver-mas {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    background: #f0f4f8;
+    border: 2px dashed #b0c4de;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #2c3e50;
+    transition: all 0.3s ease;
+    text-align: center;
+    font-weight: 600;
+}
+
+.btn-ver-mas:hover {
+    background: #e3eaf0;
+    border-color: #4A71C9;
+    color: #1a2a3a;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(74, 113, 201, 0.15);
+}
+
+.btn-ver-mas .contador {
+    font-weight: bold;
+    color: #4A71C9;
+    background: rgba(74, 113, 201, 0.1);
+    padding: 2px 10px;
+    border-radius: 12px;
+    margin-left: 5px;
+}
+
+/* Contenedor con scroll */
+.lista-container {
+    max-height: 450px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.lista-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.lista-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.lista-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 10px;
+}
+
+.lista-container::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
