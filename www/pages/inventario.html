@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario - POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* Estilos para modales */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #f0e8e0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .modal-header h3 { color: #c0392b; margin: 0; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .modal-actions .btn { flex: 1; min-width: 100px; }
+        .modal-strong { font-weight: bold; font-size: 1.1rem; padding: 8px 0; }
+        .btn-icon { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+        .btn-icon:hover { color: #333; }
+        .money-input { font-family: monospace; font-size: 1rem; }
+        .btn-sm { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 0 2px; }
+        .btn-edit { background: #3498db; color: white; }
+        .btn-receive { background: #27ae60; color: white; }
+        .btn-delete { background: #e74c3c; color: white; }
+        .btn-primary { background: #c0392b; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
+        .btn-success { background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; }
+        .btn-danger { background: #e74c3c; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; }
+        .btn-outline { background: transparent; border: 2px solid #ddd; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 5px; }
+        .form-group input { width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📦 Gestión de Inventario</h1>
+            <button onclick="abrirModalAgregarProducto()" class="btn btn-primary">➕ Nuevo Producto</button>
+            
+        </div>
+        <nav class="main-nav">
+            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn nav-btn-active">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+        </nav>
+        
+        <div id="alertContainer"></div>
+        
+        <div class="card">
+          <div class="card">
+    <h3>Buscar producto por código</h3>
+    <div class="form-group">
+        <label>Escanea o escribe el código</label>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <input type="text" id="scannerInput" placeholder="Escanea o escribe el código y presiona Enter" autocomplete="off" style="flex:1; min-width:200px;">
+            <button class="btn btn-primary" onclick="buscarProductoPorCodigoInventario()">🔎 Buscar</button>
+            <button class="btn btn-success" onclick="agregarRapidoPorCodigo()" style="background:#27ae60;">➕ Agregar Rápido</button>
+        </div>
+        <small>💡 Si el código no existe, usa "Agregar Rápido" para crearlo.</small>
+    </div>
+</div>
+        
+        <div class="card">
+            <h3>Productos en stock</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Precio</th>
+                            <th>Stock</th>
+                            <th>Mínimo</th>
+                            <th>Categoría</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaInventario">
+                        <tr><td colspan="7">⏳ Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>⚠️ Alertas de stock bajo</h3>
+            <div id="alertasStock"></div>
+        </div>
+        
+        <div style="margin-top:20px;">
+            <button onclick="window.location.href='../index.html'" class="btn">⬅️ Volver</button>
+        </div>
+    </div>
+
+    <!-- ===== MODAL NUEVO PRODUCTO ===== -->
+    <div id="modalNuevoProducto" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🆕 Nuevo producto</h3>
+                <button class="btn-icon" onclick="cerrarModalNuevoProducto()">✖</button>
+            </div>
+            <p style="color:#666; margin-bottom:15px;">Crea un producto nuevo con precio, stock y proveedor.</p>
+            <div class="form-group">
+                <label>Código</label>
+                <input type="text" id="nuevoProductoCodigo" autofocus>
+            </div>
+            <div class="form-group">
+                <label>Nombre</label>
+                <input type="text" id="nuevoProductoNombre" placeholder="Ej: Caja de macarons">
+            </div>
+            <div class="form-group">
+                <label>Precio</label>
+                <input type="number" id="nuevoProductoPrecio" min="0" step="100" placeholder="Ej: 2500">
+            </div>
+            <div class="form-group">
+                <label>Stock inicial</label>
+                <input type="number" id="nuevoProductoStock" min="0" step="1" placeholder="Ej: 20">
+            </div>
+            <div class="form-group">
+                <label>Stock mínimo</label>
+                <input type="number" id="nuevoProductoMinimo" min="0" step="1" value="5">
+            </div>
+            <div class="form-group">
+                <label>Categoría</label>
+                <input type="text" id="nuevoProductoCategoria" placeholder="Bebidas">
+            </div>
+            <div class="form-group">
+                <label>Proveedor</label>
+                <input type="text" id="nuevoProductoProveedor" placeholder="Ej: Distribuidora">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="guardarNuevoProductoInventario()">Guardar producto</button>
+                <button class="btn btn-outline" onclick="cerrarModalNuevoProducto()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL EDITAR PRODUCTO ===== -->
+    <div id="modalEditarProducto" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Editar Producto</h3>
+                <button class="btn-icon" onclick="cerrarModalEditar()">✖</button>
+            </div>
+            <p style="color:#666; margin-bottom:15px;">Actualiza el precio, stock o stock mínimo del producto.</p>
+            <input type="hidden" id="editarProductoId">
+            <div class="form-group">
+                <label>Producto</label>
+                <div id="editarProductoNombre" class="modal-strong" style="font-size:1.2rem;"></div>
+            </div>
+            <div class="form-group">
+                <label>Código</label>
+                <div id="editarProductoCodigo" style="color:#666;"></div>
+            </div>
+            <div class="form-group">
+                <label>Precio ($)</label>
+                <input type="number" id="editarPrecio" class="money-input" min="0" step="100">
+            </div>
+            <div class="form-group">
+                <label>Stock actual</label>
+                <input type="number" id="editarStock" min="0" step="1">
+            </div>
+            <div class="form-group">
+                <label>Stock mínimo</label>
+                <input type="number" id="editarStockMinimo" min="0" step="1">
+            </div>
+            <div class="form-group">
+                <label>Categoría</label>
+                <input type="text" id="editarCategoria">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="guardarEdicion()">💾 Guardar Cambios</button>
+                <button class="btn btn-outline" onclick="cerrarModalEditar()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL RECIBIR PEDIDO ===== -->
+    <div id="modalRecibirPedido" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📦 Recibir Pedido</h3>
+                <button class="btn-icon" onclick="cerrarModalRecibir()">✖</button>
+            </div>
+            <p style="color:#666; margin-bottom:15px;">Registra la llegada de nuevas unidades al inventario.</p>
+            <input type="hidden" id="recibirProductoId">
+            <div class="form-group">
+                <label>Producto</label>
+                <div id="recibirProductoNombre" class="modal-strong" style="font-size:1.2rem;"></div>
+            </div>
+            <div class="form-group">
+                <label>Stock actual</label>
+                <div id="recibirStockActual" style="font-weight:bold; color:#27ae60;"></div>
+            </div>
+            <div class="form-group">
+                <label>Cantidad recibida</label>
+                <input type="number" id="recibirCantidad" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label>Precio de compra (por unidad)</label>
+                <input type="number" id="recibirPrecioCompra" class="money-input" min="0" step="100" placeholder="Ej: 1800">
+            </div>
+            <div class="form-group">
+                <label>Motivo / Proveedor</label>
+                <input type="text" id="recibirMotivo" placeholder="Ej: Pedido a Proveedor">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-success" onclick="confirmarRecibir()">✅ Confirmar Recepción</button>
+                <button class="btn btn-outline" onclick="cerrarModalRecibir()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL ELIMINAR PRODUCTO ===== -->
+    <div id="modalEliminarProducto" class="modal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h3 style="color:#e74c3c;">⚠️ Eliminar Producto</h3>
+                <button class="btn-icon" onclick="cerrarModalEliminar()">✖</button>
+            </div>
+            <div style="text-align:center; padding:15px 0;">
+                <p style="font-size:1.2rem; margin-bottom:10px;">¿Estás seguro de eliminar este producto?</p>
+                <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin:15px 0;">
+                    <p><strong id="eliminarProductoNombre">-</strong></p>
+                    <p style="color:#666;"><span id="eliminarProductoCodigo">-</span> | Stock: <span id="eliminarProductoStock">0</span></p>
+                </div>
+                <p style="color:#e74c3c; font-size:0.9rem;">⚠️ Esta acción no se puede deshacer</p>
+                <input type="hidden" id="eliminarProductoId">
+            </div>
+            <div class="modal-actions" style="justify-content:center;">
+                <button class="btn btn-danger" onclick="confirmarEliminar()">🗑️ Sí, Eliminar</button>
+                <button class="btn btn-outline" onclick="cerrarModalEliminar()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+<!-- ===== MODAL AGREGAR RÁPIDO ===== -->
+<div id="modalAgregarRapido" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 style="color:#27ae60;">⚡ Agregar Producto Rápido</h3>
+            <button class="btn-icon" onclick="cerrarModalAgregarRapido()">✖</button>
+        </div>
+        <p style="color:#666; margin-bottom:15px;">El código <strong id="rapidoCodigoMostrar">-</strong> no existe. Completa los datos para crearlo.</p>
+        <input type="hidden" id="rapidoCodigo">
+        <div class="form-group">
+            <label>Código de barras</label>
+            <input type="text" id="rapidoCodigoInput" style="background:#f0f0f0;" readonly>
+        </div>
+        <div class="form-group">
+            <label>Nombre del producto *</label>
+            <input type="text" id="rapidoNombre" placeholder="Ej: Gaseosa Coca-Cola 600ml">
+        </div>
+        <div class="form-group">
+            <label>Precio de venta ($) *</label>
+            <input type="number" id="rapidoPrecio" min="0" step="100" placeholder="Ej: 4000">
+        </div>
+        <div class="form-group">
+            <label>Stock inicial *</label>
+            <input type="number" id="rapidoStock" min="0" step="1" placeholder="Ej: 20" value="0">
+        </div>
+        <div class="form-group">
+            <label>Stock mínimo</label>
+            <input type="number" id="rapidoMinimo" min="0" step="1" value="5">
+        </div>
+        <div class="form-group">
+            <label>Categoría</label>
+            <input type="text" id="rapidoCategoria" placeholder="Ej: Bebidas, Pasteles">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-success" onclick="guardarProductoRapido()" style="background:#27ae60;">✅ Guardar Producto</button>
+            <button class="btn btn-outline" onclick="cerrarModalAgregarRapido()">Cancelar</button>
+        </div>
+    </div>
+</div>
+    <script>
+
+        // ========== AGREGAR RÁPIDO POR CÓDIGO ==========
+function agregarRapidoPorCodigo() {
+    const input = document.getElementById('scannerInput');
+    const codigo = input.value.trim();
+    
+    if (!codigo) {
+        alert('⚠️ Primero escanea o escribe un código de barras');
+        return;
+    }
+    
+    // Verificar si el producto ya existe
+    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+    const existe = productos.find(p => p.codigo && p.codigo.toUpperCase() === codigo.toUpperCase());
+    
+    if (existe) {
+        alert(`❌ El producto "${existe.nombre}" ya existe con el código ${codigo}`);
+        return;
+    }
+    
+    // Abrir modal con el código precargado
+    document.getElementById('rapidoCodigo').value = codigo;
+    document.getElementById('rapidoCodigoInput').value = codigo;
+    document.getElementById('rapidoCodigoMostrar').textContent = codigo;
+    document.getElementById('rapidoNombre').value = '';
+    document.getElementById('rapidoPrecio').value = '';
+    document.getElementById('rapidoStock').value = 0;
+    document.getElementById('rapidoMinimo').value = 5;
+    document.getElementById('rapidoCategoria').value = '';
+    
+    document.getElementById('modalAgregarRapido').classList.add('show');
+    document.getElementById('modalAgregarRapido').style.display = 'flex';
+    document.getElementById('rapidoNombre').focus();
+    
+    // Limpiar el input de búsqueda
+    input.value = '';
+}
+
+// ========== GUARDAR PRODUCTO RÁPIDO ==========
+function guardarProductoRapido() {
+    const codigo = document.getElementById('rapidoCodigo').value.trim();
+    const nombre = document.getElementById('rapidoNombre').value.trim();
+    const precio = document.getElementById('rapidoPrecio').value;
+    const stock = document.getElementById('rapidoStock').value;
+    const stockMinimo = document.getElementById('rapidoMinimo').value;
+    const categoria = document.getElementById('rapidoCategoria').value.trim();
+    
+    // Validaciones
+    if (!codigo) {
+        alert('⚠️ El código es obligatorio');
+        return;
+    }
+    
+    if (!nombre) {
+        alert('⚠️ Ingresa el nombre del producto');
+        document.getElementById('rapidoNombre').focus();
+        return;
+    }
+    
+    if (!precio || parseFloat(precio) <= 0) {
+        alert('⚠️ Ingresa un precio válido (mayor a 0)');
+        document.getElementById('rapidoPrecio').focus();
+        return;
+    }
+    
+    if (stock === '' || parseInt(stock) < 0) {
+        alert('⚠️ Ingresa un stock válido (0 o más)');
+        document.getElementById('rapidoStock').focus();
+        return;
+    }
+    
+    // Verificar que no exista otro producto con el mismo código
+    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+    const existe = productos.find(p => p.codigo && p.codigo.toUpperCase() === codigo.toUpperCase());
+    
+    if (existe) {
+        alert(`❌ Ya existe un producto con el código "${codigo}"`);
+        return;
+    }
+    
+    // Crear el nuevo producto
+    const nuevoProducto = {
+        id: Date.now() + Math.random() * 100,
+        codigo: codigo,
+        nombre: nombre,
+        precio: parseFloat(precio),
+        stock: parseInt(stock),
+        stock_minimo: parseInt(stockMinimo) || 5,
+        categoria: categoria || 'Sin categoría',
+        proveedor: 'Agregado rápido'
+    };
+    
+    productos.push(nuevoProducto);
+    localStorage.setItem('pos_productos', JSON.stringify(productos));
+    
+    // Cerrar modal y actualizar
+    cerrarModalAgregarRapido();
+    cargarInventario();
+    
+    alert(`✅ Producto "${nombre}" creado exitosamente!\n📦 Código: ${codigo}\n💰 Precio: $${parseFloat(precio).toLocaleString('es-CO')}\n📊 Stock: ${stock}`);
+}
+
+
+
+
+// ========== CERRAR MODAL AGREGAR RÁPIDO ==========
+function cerrarModalAgregarRapido() {
+    document.getElementById('modalAgregarRapido').style.display = 'none';
+    document.getElementById('modalAgregarRapido').classList.remove('show');
+}
+
+document.addEventListener('click', function(e) {
+    const modales = ['modalNuevoProducto', 'modalEditarProducto', 'modalRecibirPedido', 'modalEliminarProducto', 'modalAgregarRapido'];
+    modales.forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal && e.target === modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('show');
+        }
+    });
+});
+
+        // ========== VARIABLES GLOBALES ==========
+        let productosCache = [];
+
+        // ========== CARGAR INVENTARIO ==========
+        function cargarInventario() {
+            const tbody = document.getElementById('tablaInventario');
+            tbody.innerHTML = '<tr><td colspan="7">⏳ Cargando productos...</td></tr>';
+            
+            try {
+                const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+                
+                if (productos.length > 0) {
+                    productosCache = productos;
+                    renderizarTabla(productos);
+                    actualizarAlertas(productos);
+                } else {
+                    // Productos de ejemplo
+                    const productosEjemplo = [
+                        { id: 1, codigo: 'BEB001', nombre: 'Gaseosa Coca-Cola 600ml', precio: 4000, stock: 80, stock_minimo: 15, categoria: 'Bebidas', proveedor: 'Coca-Cola' },
+                        { id: 2, codigo: 'BEB002', nombre: 'Gaseosa Coca-Cola 1.5L', precio: 8000, stock: 40, stock_minimo: 8, categoria: 'Bebidas', proveedor: 'Coca-Cola' },
+                        { id: 3, codigo: 'BEB003', nombre: 'Agua Cristal 600ml', precio: 2500, stock: 3, stock_minimo: 8, categoria: 'Bebidas', proveedor: 'Cristal' },
+                        { id: 4, codigo: 'BEB004', nombre: 'Jugo Hit Manzana', precio: 3000, stock: 5, stock_minimo: 5, categoria: 'Bebidas', proveedor: 'Hit' },
+                        { id: 5, codigo: 'BEB005', nombre: 'Jugo Hit Naranja', precio: 3000, stock: 10, stock_minimo: 5, categoria: 'Bebidas', proveedor: 'Hit' },
+                        { id: 6, codigo: 'PASTEL001', nombre: 'Pastel Tradicional', precio: 2000, stock: 50, stock_minimo: 10, categoria: 'Pasteles', proveedor: 'Proveedor A' },
+                        { id: 7, codigo: 'PASTEL002', nombre: 'Pastel de Fresa', precio: 2500, stock: 30, stock_minimo: 8, categoria: 'Pasteles', proveedor: 'Proveedor A' },
+                        { id: 8, codigo: 'PASTEL003', nombre: 'Pastel de Vainilla', precio: 2200, stock: 40, stock_minimo: 10, categoria: 'Pasteles', proveedor: 'Proveedor A' }
+                    ];
+                    localStorage.setItem('pos_productos', JSON.stringify(productosEjemplo));
+                    productosCache = productosEjemplo;
+                    renderizarTabla(productosEjemplo);
+                    actualizarAlertas(productosEjemplo);
+                }
+            } catch (error) {
+                console.error('❌ Error:', error);
+                tbody.innerHTML = `<tr><td colspan="7">❌ Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        // ========== RENDERIZAR TABLA ==========
+        function renderizarTabla(productos) {
+            const tbody = document.getElementById('tablaInventario');
+            
+            if (!productos || productos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7">📭 No hay productos registrados</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            productos.forEach(p => {
+                const stockBajo = Number(p.stock) <= Number(p.stock_minimo) ? 'style="color: red; font-weight: bold;"' : '';
+                html += `
+                    <tr>
+                        <td><strong>${p.codigo}</strong></td>
+                        <td>${p.nombre}</td>
+                        <td>$${Number(p.precio).toLocaleString('es-CO')}</td>
+                        <td ${stockBajo}>${p.stock}</td>
+                        <td>${p.stock_minimo}</td>
+                        <td>${p.categoria || 'Sin categoría'}</td>
+                        <td>
+                            <button onclick="editarProducto(${p.id})" class="btn-sm btn-edit">✏️</button>
+                            <button onclick="recibirPedido(${p.id})" class="btn-sm btn-receive">📦</button>
+                            <button onclick="eliminarProducto(${p.id})" class="btn-sm btn-delete">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        // ========== ACTUALIZAR ALERTAS ==========
+        function actualizarAlertas(productos) {
+            const criticos = productos.filter(p => Number(p.stock) <= Number(p.stock_minimo));
+            const container = document.getElementById('alertasStock');
+            
+            if (criticos.length === 0) {
+                container.innerHTML = '<p>✅ No hay productos con stock crítico</p>';
+                return;
+            }
+            
+            let html = '';
+            criticos.forEach(p => {
+                html += `
+                    <div style="padding:10px; margin:5px 0; background:#fff3e0; border-radius:8px; border-left: 4px solid #e67e22;">
+                        ⚠️ <strong>${p.nombre}</strong> (${p.codigo}): stock ${p.stock} (mínimo ${p.stock_minimo})
+                        <button onclick="recibirPedido(${p.id})" style="float:right; background:#27ae60; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;">📦 Recibir</button>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // ========== BUSCAR PRODUCTO ==========
+        function buscarProductoPorCodigoInventario() {
+            const input = document.getElementById('scannerInput');
+            const codigo = input.value.trim();
+            
+            if (!codigo) {
+                renderizarTabla(productosCache);
+                return;
+            }
+            
+            const localProductos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const encontrado = localProductos.filter(p => 
+                p.codigo && p.codigo.toUpperCase() === codigo.toUpperCase()
+            );
+            
+            if (encontrado.length > 0) {
+                renderizarTabla(encontrado);
+                alert(`✅ ${encontrado.length} producto(s) encontrado(s)`);
+            } else {
+                alert(`❌ No se encontró el producto "${codigo}"`);
+                renderizarTabla(productosCache);
+            }
+            input.value = '';
+        }
+
+        // ========== GUARDAR NUEVO PRODUCTO ==========
+        function guardarNuevoProductoInventario() {
+            const codigo = document.getElementById('nuevoProductoCodigo').value.trim();
+            const nombre = document.getElementById('nuevoProductoNombre').value.trim();
+            const precio = document.getElementById('nuevoProductoPrecio').value;
+            const stock = document.getElementById('nuevoProductoStock').value;
+            const stock_minimo = document.getElementById('nuevoProductoMinimo').value;
+            const categoria = document.getElementById('nuevoProductoCategoria').value.trim();
+            const proveedor = document.getElementById('nuevoProductoProveedor').value.trim();
+
+            if (!codigo || !nombre || !precio || !stock) {
+                alert('⚠️ Todos los campos son obligatorios');
+                return;
+            }
+
+            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const nuevoProducto = {
+                id: Date.now(),
+                codigo: codigo,
+                nombre: nombre,
+                precio: parseFloat(precio),
+                stock: parseInt(stock),
+                stock_minimo: parseInt(stock_minimo) || 5,
+                categoria: categoria || 'Sin categoría',
+                proveedor: proveedor || 'Sin proveedor'
+            };
+            productos.push(nuevoProducto);
+            localStorage.setItem('pos_productos', JSON.stringify(productos));
+            
+            alert('✅ Producto creado exitosamente');
+            cerrarModalNuevoProducto();
+            cargarInventario();
+        }
+
+        // ========== ABRIR/CERRAR MODAL NUEVO ==========
+        function abrirModalAgregarProducto() {
+            document.getElementById('modalNuevoProducto').classList.add('show');
+            document.getElementById('modalNuevoProducto').style.display = 'flex';
+            document.getElementById('nuevoProductoCodigo').focus();
+        }
+
+        function cerrarModalNuevoProducto() {
+            document.getElementById('modalNuevoProducto').style.display = 'none';
+            document.getElementById('modalNuevoProducto').classList.remove('show');
+        }
+
+        // ========== EDITAR PRODUCTO ==========
+        function editarProducto(id) {
+            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const producto = productos.find(p => p.id === id);
+            
+            if (!producto) {
+                alert('❌ Producto no encontrado');
+                return;
+            }
+            
+            document.getElementById('editarProductoId').value = producto.id;
+            document.getElementById('editarProductoNombre').textContent = producto.nombre;
+            document.getElementById('editarProductoCodigo').textContent = 'Código: ' + producto.codigo;
+            document.getElementById('editarPrecio').value = producto.precio;
+            document.getElementById('editarStock').value = producto.stock;
+            document.getElementById('editarStockMinimo').value = producto.stock_minimo || 5;
+            document.getElementById('editarCategoria').value = producto.categoria || '';
+            
+            document.getElementById('modalEditarProducto').classList.add('show');
+            document.getElementById('modalEditarProducto').style.display = 'flex';
+        }
+
+        function guardarEdicion() {
+            const id = parseInt(document.getElementById('editarProductoId').value);
+            const precio = parseFloat(document.getElementById('editarPrecio').value);
+            const stock = parseInt(document.getElementById('editarStock').value);
+            const stockMinimo = parseInt(document.getElementById('editarStockMinimo').value);
+            const categoria = document.getElementById('editarCategoria').value.trim();
+            
+            if (isNaN(precio) || precio < 0) {
+                alert('⚠️ Ingresa un precio válido');
+                return;
+            }
+            
+            if (isNaN(stock) || stock < 0) {
+                alert('⚠️ Ingresa un stock válido');
+                return;
+            }
+            
+            let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const index = productos.findIndex(p => p.id === id);
+            
+            if (index === -1) {
+                alert('❌ Producto no encontrado');
+                return;
+            }
+            
+            productos[index].precio = precio;
+            productos[index].stock = stock;
+            productos[index].stock_minimo = stockMinimo;
+            productos[index].categoria = categoria || productos[index].categoria;
+            
+            localStorage.setItem('pos_productos', JSON.stringify(productos));
+            
+            cerrarModalEditar();
+            cargarInventario();
+            alert('✅ Producto actualizado correctamente');
+        }
+
+        function cerrarModalEditar() {
+            document.getElementById('modalEditarProducto').style.display = 'none';
+            document.getElementById('modalEditarProducto').classList.remove('show');
+        }
+
+        // ========== RECIBIR PEDIDO ==========
+        function recibirPedido(id) {
+            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const producto = productos.find(p => p.id === id);
+            
+            if (!producto) {
+                alert('❌ Producto no encontrado');
+                return;
+            }
+            
+            document.getElementById('recibirProductoId').value = producto.id;
+            document.getElementById('recibirProductoNombre').textContent = producto.nombre;
+            document.getElementById('recibirStockActual').textContent = producto.stock + ' unidades';
+            document.getElementById('recibirCantidad').value = 1;
+            document.getElementById('recibirPrecioCompra').value = '';
+            document.getElementById('recibirMotivo').value = 'Pedido a proveedor';
+            
+            document.getElementById('modalRecibirPedido').classList.add('show');
+            document.getElementById('modalRecibirPedido').style.display = 'flex';
+            document.getElementById('recibirCantidad').focus();
+        }
+
+       function confirmarRecibir() {
+    const id = parseInt(document.getElementById('recibirProductoId').value);
+    const cantidad = parseInt(document.getElementById('recibirCantidad').value);
+    const precioCompra = parseFloat(document.getElementById('recibirPrecioCompra').value) || 0;
+    const motivo = document.getElementById('recibirMotivo').value.trim() || 'Sin motivo';
+    
+    if (isNaN(cantidad) || cantidad <= 0) {
+        alert('⚠️ Ingresa una cantidad válida');
+        return;
+    }
+    
+    let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+    const index = productos.findIndex(p => p.id === id);
+    
+    if (index === -1) {
+        alert('❌ Producto no encontrado');
+        return;
+    }
+    
+    const stockAnterior = productos[index].stock;
+    const precioActual = productos[index].precio || 0;
+    
+    // Actualizar stock
+    productos[index].stock = stockAnterior + cantidad;
+    
+    // SI EL PRECIO DE COMPRA ES DIFERENTE Y MAYOR A 0, ACTUALIZAR EL PRECIO
+    if (precioCompra > 0 && precioCompra !== precioActual) {
+        productos[index].precio = precioCompra;
+        console.log(`💰 Precio actualizado: ${productos[index].nombre} de $${precioActual} a $${precioCompra}`);
+    }
+    
+    // Guardar historial de movimientos
+    const movimientos = JSON.parse(localStorage.getItem('pos_movimientos_stock') || '[]');
+    movimientos.push({
+        id: Date.now(),
+        producto_id: id,
+        producto_nombre: productos[index].nombre,
+        tipo: 'ENTRADA',
+        cantidad: cantidad,
+        precio_compra: precioCompra,
+        precio_anterior: precioActual,
+        precio_nuevo: precioCompra > 0 ? precioCompra : precioActual,
+        stock_anterior: stockAnterior,
+        stock_nuevo: productos[index].stock,
+        motivo: motivo,
+        fecha: new Date().toISOString()
+    });
+    localStorage.setItem('pos_movimientos_stock', JSON.stringify(movimientos));
+    localStorage.setItem('pos_productos', JSON.stringify(productos));
+    
+    cerrarModalRecibir();
+    cargarInventario();
+    
+    let mensaje = `✅ Se recibieron ${cantidad} unidades de ${productos[index].nombre}\n📊 Nuevo stock: ${productos[index].stock} unidades`;
+    if (precioCompra > 0 && precioCompra !== precioActual) {
+        mensaje += `\n💰 Precio actualizado: $${precioActual} → $${precioCompra}`;
+    }
+    alert(mensaje);
+}
+        function cerrarModalRecibir() {
+            document.getElementById('modalRecibirPedido').style.display = 'none';
+            document.getElementById('modalRecibirPedido').classList.remove('show');
+        }
+
+        // ========== ELIMINAR PRODUCTO ==========
+        function eliminarProducto(id) {
+            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const producto = productos.find(p => p.id === id);
+            
+            if (!producto) {
+                alert('❌ Producto no encontrado');
+                return;
+            }
+            
+            document.getElementById('eliminarProductoId').value = producto.id;
+            document.getElementById('eliminarProductoNombre').textContent = producto.nombre;
+            document.getElementById('eliminarProductoCodigo').textContent = 'Código: ' + producto.codigo;
+            document.getElementById('eliminarProductoStock').textContent = producto.stock;
+            
+            document.getElementById('modalEliminarProducto').classList.add('show');
+            document.getElementById('modalEliminarProducto').style.display = 'flex';
+        }
+
+        function confirmarEliminar() {
+            const id = parseInt(document.getElementById('eliminarProductoId').value);
+            
+            let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const index = productos.findIndex(p => p.id === id);
+            
+            if (index === -1) {
+                alert('❌ Producto no encontrado');
+                return;
+            }
+            
+            const nombre = productos[index].nombre;
+            productos.splice(index, 1);
+            localStorage.setItem('pos_productos', JSON.stringify(productos));
+            
+            cerrarModalEliminar();
+            cargarInventario();
+            alert(`✅ Producto "${nombre}" eliminado correctamente`);
+        }
+
+        function cerrarModalEliminar() {
+            document.getElementById('modalEliminarProducto').style.display = 'none';
+            document.getElementById('modalEliminarProducto').classList.remove('show');
+        }
+
+        // ========== CERRAR MODALES AL HACER CLIC FUERA ==========
+        document.addEventListener('click', function(e) {
+            const modales = ['modalNuevoProducto', 'modalEditarProducto', 'modalRecibirPedido', 'modalEliminarProducto'];
+            modales.forEach(id => {
+                const modal = document.getElementById(id);
+                if (modal && e.target === modal) {
+                    modal.style.display = 'none';
+                    modal.classList.remove('show');
+                }
+            });
+        });
+
+        // ========== INICIALIZAR ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarInventario();
+
+            const input = document.getElementById('scannerInput');
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    buscarProductoPorCodigoInventario();
+                }
+            });
+        });
+
+
+
+
+
+        // ========== SISTEMA DE AUDITORÍA DE STOCK ==========
+function registrarMovimientoStock(productoId, productoNombre, tipo, cantidad, motivo, usuario) {
+    const movimientos = JSON.parse(localStorage.getItem('pos_movimientos_stock') || '[]');
+    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+    const producto = productos.find(p => p.id === productoId);
+    
+    movimientos.push({
+        id: Date.now(),
+        producto_id: productoId,
+        producto_nombre: productoNombre,
+        tipo: tipo, // 'VENTA', 'DEVOLUCION', 'RECEPCION', 'AJUSTE'
+        cantidad: cantidad,
+        stock_anterior: producto ? producto.stock : 0,
+        stock_nuevo: producto ? producto.stock - cantidad : 0,
+        motivo: motivo || 'Sin motivo',
+        usuario: usuario || 'Sistema',
+        fecha: new Date().toISOString(),
+        hora: new Date().toLocaleTimeString('es-CO'),
+        // Datos adicionales para auditoría
+        ip: 'local',
+        session_id: localStorage.getItem('pos_apertura_actual_id') || 'sin_apertura'
+    });
+    
+    localStorage.setItem('pos_movimientos_stock', JSON.stringify(movimientos));
+}
+
+// ========== REPORTE DE AUDITORÍA ==========
+function verReporteAuditoria() {
+    const movimientos = JSON.parse(localStorage.getItem('pos_movimientos_stock') || '[]');
+    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+    
+    if (movimientos.length === 0) {
+        alert('📭 No hay movimientos registrados');
+        return;
+    }
+    
+    // Mostrar los últimos 50 movimientos
+    const ultimos = movimientos.slice(-50).reverse();
+    let reporte = '📊 REPORTE DE AUDITORÍA DE INVENTARIO\n';
+    reporte += '═'.repeat(50) + '\n\n';
+    
+    ultimos.forEach(m => {
+        const fecha = new Date(m.fecha);
+        const fechaStr = fecha.toLocaleDateString('es-CO') + ' ' + m.hora;
+        reporte += `📅 ${fechaStr}\n`;
+        reporte += `📦 Producto: ${m.producto_nombre}\n`;
+        reporte += `📋 Tipo: ${m.tipo}\n`;
+        reporte += `🔄 Cantidad: ${m.cantidad > 0 ? '+' : ''}${m.cantidad}\n`;
+        reporte += `📊 Stock: ${m.stock_anterior} → ${m.stock_nuevo}\n`;
+        reporte += `👤 Usuario: ${m.usuario}\n`;
+        reporte += `📝 Motivo: ${m.motivo}\n`;
+        reporte += '─'.repeat(40) + '\n';
+    });
+    
+    alert(reporte);
+}
+
+// ========== BOTÓN DE AUDITORÍA ==========
+// Agregar al HTML de inventario:
+// <button onclick="verReporteAuditoria()" class="btn btn-info">📋 Ver Auditoría</button>
+
+// ========== VENTA CON CONTROL DE STOCK ==========
+function venderBebidaConStock(aperturaId, producto) {
+    try {
+        console.log('🥤 VENDIENDO BEBIDA CON STOCK:', producto.nombre);
+        
+        // 1. Verificar stock actual
+        const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+        const productoDB = productos.find(p => p.id === producto.id);
+        
+        if (!productoDB) {
+            mostrarMensaje('❌ Producto no encontrado en inventario', 'error');
+            return null;
+        }
+        
+        // 2. Validar stock disponible
+        if (productoDB.stock <= 0) {
+            mostrarMensaje(`❌ ${productoDB.nombre} - SIN STOCK (Stock: ${productoDB.stock})`, 'error');
+            return null;
+        }
+        
+        // 3. Registrar la venta
+        const venta = {
+            id: Date.now() + Math.random() * 1000,
+            apertura_id: parseInt(aperturaId),
+            producto_id: parseInt(producto.id),
+            cantidad: 1,
+            precio: producto.precio || 0,
+            subtotal: producto.precio || 0,
+            fecha: new Date().toISOString(),
+            tipo: 'bebida'
+        };
+        
+        // 4. Descontar del inventario
+        const index = productos.findIndex(p => p.id === producto.id);
+        productos[index].stock -= 1;
+        localStorage.setItem('pos_productos', JSON.stringify(productos));
+        
+        // 5. Registrar movimiento de stock (AUDITORÍA)
+        registrarMovimientoStock(
+            producto.id,
+            producto.nombre,
+            'VENTA',
+            1,
+            `Venta #${venta.id} - Apertura: ${aperturaId}`,
+            apertura.responsable || 'Empleado'
+        );
+        
+        // 6. Guardar la venta
+        const ventasBebidas = DB.get('ventas_bebidas');
+        ventasBebidas.push(venta);
+        DB.set('ventas_bebidas', ventasBebidas);
+        
+        console.log('✅ Venta registrada y stock actualizado');
+        return venta;
+        
+    } catch (e) {
+        console.error('Error en venderBebidaConStock:', e);
+        return null;
+    }
+}
+
+    </script>
+</body>
+</html>

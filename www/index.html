@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Pastelería - Sistema de Caja</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card-stats p {
+            margin: 8px 0;
+            font-size: 1rem;
+        }
+        .card-stats .valor {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .card-stats .total {
+            font-size: 1.2rem;
+            color: #c0392b;
+        }
+        .alertas-stock {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .alert-item {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: #fff3e0;
+            border-radius: 8px;
+            border-left: 4px solid #e67e22;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .alert-item .btn-recibir {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .alert-item .btn-recibir:hover {
+            background: #219a52;
+        }
+        .turno-anterior {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+            border: 1px solid #dee2e6;
+        }
+        .turno-anterior h4 {
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+        .turno-anterior .fecha-cierre {
+            color: #6c757d;
+            font-size: 0.85rem;
+        }
+        .sin-datos {
+            color: #999;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->  
+        <header class="header">
+            <div class="logo">
+                <h1> Sistema de control e inventario</h1>
+                <span class="fecha" id="fechaActual"></span>
+            </div>
+            <div class="turno-info">
+                <span id="estadoTurno" class="estado-cerrado">🔴 Turno cerrado</span>
+                <span id="baseInfo" class="base-info"></span>
+            </div>
+        </header>
+
+        <!-- Menu principal -->
+        <nav class="main-nav">
+            <button onclick="window.location.href='pages/apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='pages/ventas.html'" class="nav-btn">💰 Ventas</button>
+            <button onclick="window.location.href='pages/cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='pages/historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='pages/inventario.html'" class="nav-btn">📦 Inventario</button>
+            <button onclick="window.location.href='pages/recibir_pedido.html'" class="nav-btn">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='pages/dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+        </nav>
+
+        <!-- Dashboard resumen -->
+        <div class="dashboard-grid">
+            <!-- VENTAS DEL TURNO ACTUAL -->
+            <div class="card">
+                <h3>📈 Ventas de este turno</h3>
+                <div class="card-stats" id="ventasTurnoActual">
+                    <p>🍰 Pasteles: <span class="valor" id="resumenPasteles">$0</span></p>
+                    <p>🥤 Bebidas: <span class="valor" id="resumenBebidas">$0</span></p>
+                    <p>💰 Total Efectivo: <span class="valor total" id="resumenTotal">$0</span></p>
+                    <p>📱 Nequi: <span class="valor" id="resumenNequi">$0</span></p>
+                </div>
+            </div>
+
+            <!-- VENTAS DEL ÚLTIMO CIERRE -->
+            <div class="card">
+                <h3>📜 Último cierre realizado</h3>
+                <div id="ultimoCierre">
+                    <div class="sin-datos">Cargando...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STOCK CRÍTICO -->
+        <div class="card">
+            <h3>⚠️ Stock crítico</h3>
+            <div id="alertasStock" class="alertas-stock">
+                <p>Cargando...</p>
+            </div>
+        </div>
+
+        <!-- Información del turno actual -->
+        <div class="card" id="infoTurno" style="text-align: center;">
+            <p id="mensajeTurno">💰 No hay turno activo. Realiza una apertura para comenzar.</p>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  1. PRIMERO: Scripts externos (database.js y app.js)          -->
+    <!-- ============================================================ -->
+    <script src="js/database.js"></script>
+    <script src="js/app.js"></script>
+
+    <!-- ============================================================ -->
+    <!--  2. SEGUNDO: Script inline con la lógica del index            -->
+    <script>
+    // ==================== FUNCIÓN PARA OBTENER APERTURA ACTUAL ====================
+    window.getAperturaActual = function() {
+        try {
+            const aperturaId = localStorage.getItem('pos_apertura_actual_id');
+            if (aperturaId) {
+                const aperturasData = localStorage.getItem('pos_aperturas_caja');
+                const aperturas = aperturasData ? JSON.parse(aperturasData) : [];
+                const apertura = aperturas.find(a => String(a.id) === String(aperturaId) && a.estado === 'abierta');
+                if (apertura) return apertura;
+            }
+            
+            const aperturasData = localStorage.getItem('pos_aperturas_caja');
+            const aperturas = aperturasData ? JSON.parse(aperturasData) : [];
+            const aperturaAbierta = aperturas.find(a => a.estado === 'abierta');
+            if (aperturaAbierta) {
+                localStorage.setItem('pos_apertura_actual_id', String(aperturaAbierta.id));
+                return aperturaAbierta;
+            }
+            
+            return null;
+        } catch (e) {
+            console.error('Error al obtener apertura:', e);
+            return null;
+        }
+    };
+
+    // ==================== FUNCIONES DE UI ====================
+    function actualizarFecha() {
+        const hoy = new Date();
+        const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const fechaElement = document.getElementById('fechaActual');
+        if (fechaElement) {
+            fechaElement.textContent = hoy.toLocaleDateString('es-ES', opciones);
+        }
+    }
+
+    function actualizarEstadoTurno() {
+        const apertura = getAperturaActual();
+        const estadoSpan = document.getElementById('estadoTurno');
+        const baseSpan = document.getElementById('baseInfo');
+        const mensajeTurno = document.getElementById('mensajeTurno');
+        
+        if (apertura) {
+            estadoSpan.className = 'estado-abierto';
+            estadoSpan.innerHTML = '🟢 Turno abierto';
+            if (baseSpan) {
+                baseSpan.innerHTML = `👤 ${apertura.responsable || 'No especificado'}`;
+            }
+            if (mensajeTurno) {
+                const fechaApertura = new Date(apertura.fecha);
+                mensajeTurno.innerHTML = `✅ TURNO ACTIVO - Iniciado: ${fechaApertura.toLocaleTimeString()} | Responsable: ${apertura.responsable || 'No especificado'}`;
+                mensajeTurno.style.color = '#27ae60';
+                mensajeTurno.style.fontWeight = 'bold';
+            }
+        } else {
+            estadoSpan.className = 'estado-cerrado';
+            estadoSpan.innerHTML = '🔴 Turno cerrado';
+            if (baseSpan) {
+                baseSpan.innerHTML = '';
+            }
+            if (mensajeTurno) {
+                mensajeTurno.innerHTML = '🔴 No hay turno activo. Haz clic en "Apertura" para comenzar un nuevo turno.';
+                mensajeTurno.style.color = '#e74c3c';
+                mensajeTurno.style.fontWeight = 'normal';
+            }
+        }
+    }
+
+    // ==================== OBTENER ÚLTIMO CIERRE ====================
+    function obtenerUltimoCierre() {
+        try {
+            const cierresData = localStorage.getItem('pos_cierres_caja');
+            const cierres = cierresData ? JSON.parse(cierresData) : [];
+            
+            if (cierres.length === 0) {
+                return null;
+            }
+            
+            // Ordenar por fecha (más reciente primero)
+            cierres.sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
+            return cierres[0];
+        } catch (e) {
+            console.error('Error al obtener último cierre:', e);
+            return null;
+        }
+    }
+
+    // ==================== ACTUALIZAR DASHBOARD ====================
+    function actualizarDashboard() {
+        const apertura = getAperturaActual();
+        
+        // ===== VENTAS DEL TURNO ACTUAL =====
+        if (apertura) {
+            try {
+                let ventasPasteles = [];
+                let ventasBebidas = [];
+                let transferencias = [];
+                let devoluciones = [];
+                
+                try {
+                    ventasPasteles = JSON.parse(localStorage.getItem('pos_ventas_pasteles') || '[]');
+                    ventasBebidas = JSON.parse(localStorage.getItem('pos_ventas_bebidas') || '[]');
+                    transferencias = JSON.parse(localStorage.getItem('pos_transferencias_nequi') || '[]');
+                    devoluciones = JSON.parse(localStorage.getItem('pos_devoluciones') || '[]');
+                } catch (e) {
+                    console.error('Error al leer datos:', e);
+                }
+                
+                const aperturaIdStr = String(apertura.id);
+                
+                const ventasPastelesFiltradas = ventasPasteles.filter(v => String(v.apertura_id) === aperturaIdStr);
+                const ventasBebidasFiltradas = ventasBebidas.filter(v => String(v.apertura_id) === aperturaIdStr);
+                const transferenciasFiltradas = transferencias.filter(t => String(t.apertura_id) === aperturaIdStr);
+                const devolucionesFiltradas = devoluciones.filter(d => String(d.aperturaId) === aperturaIdStr || String(d.apertura_id) === aperturaIdStr);
+                
+                let totalPasteles = 0;
+                ventasPastelesFiltradas.forEach(v => {
+                    const ventaIdStr = String(v.id);
+                    const devuelto = devolucionesFiltradas
+                        .filter(d => String(d.ventaId) === ventaIdStr && !d.anulada)
+                        .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+                    const cantidadVendida = (v.cantidad || 0) - devuelto;
+                    totalPasteles += cantidadVendida * (v.precio_unitario || 2000);
+                });
+                
+                let totalBebidas = 0;
+                ventasBebidasFiltradas.forEach(v => {
+                    const ventaIdStr = String(v.id);
+                    const devuelto = devolucionesFiltradas
+                        .filter(d => String(d.ventaId) === ventaIdStr && !d.anulada)
+                        .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+                    const cantidadVendida = (v.cantidad || 1) - devuelto;
+                    totalBebidas += cantidadVendida * (v.precio || 0);
+                });
+                
+                const totalNequi = transferenciasFiltradas.reduce((sum, t) => sum + (t.monto || 0), 0);
+                
+                document.getElementById('resumenPasteles').textContent = `$${totalPasteles.toLocaleString('es-ES')}`;
+                document.getElementById('resumenBebidas').textContent = `$${totalBebidas.toLocaleString('es-ES')}`;
+                document.getElementById('resumenTotal').textContent = `$${(totalPasteles + totalBebidas).toLocaleString('es-ES')}`;
+                document.getElementById('resumenNequi').textContent = `$${totalNequi.toLocaleString('es-ES')}`;
+            } catch (e) {
+                console.error('Error al actualizar dashboard:', e);
+                resetearTotales();
+            }
+        } else {
+            resetearTotales();
+        }
+        
+        // ===== ÚLTIMO CIERRE =====
+        actualizarUltimoCierre();
+        
+        // ===== STOCK CRÍTICO =====
+        actualizarAlertasStock();
+    }
+
+    function resetearTotales() {
+        document.getElementById('resumenPasteles').textContent = '$0';
+        document.getElementById('resumenBebidas').textContent = '$0';
+        document.getElementById('resumenTotal').textContent = '$0';
+        document.getElementById('resumenNequi').textContent = '$0';
+    }
+
+    // ==================== ACTUALIZAR ÚLTIMO CIERRE ====================
+    function actualizarUltimoCierre() {
+        const container = document.getElementById('ultimoCierre');
+        const ultimoCierre = obtenerUltimoCierre();
+        
+        if (!ultimoCierre) {
+            container.innerHTML = '<div class="sin-datos">📭 No hay cierres registrados aún</div>';
+            return;
+        }
+        
+        const fecha = new Date(ultimoCierre.fecha_cierre);
+        const totalEfectivo = (ultimoCierre.total_ventas_pasteles || 0) + (ultimoCierre.total_ventas_bebidas || 0);
+        const totalNequi = ultimoCierre.total_nequi || 0;
+        const totalGeneral = totalEfectivo + totalNequi;
+        
+        container.innerHTML = `
+            <div class="turno-anterior">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:5px;">
+                    <div>
+                        <strong>${ultimoCierre.responsable || 'No especificado'}</strong>
+                        <span class="fecha-cierre"> - ${fecha.toLocaleDateString('es-ES')} ${fecha.toLocaleTimeString('es-ES')}</span>
+                    </div>
+                    <span style="background:${ultimoCierre.modo === 'manana' ? '#27ae60' : '#e67e22'}; color:white; padding:2px 12px; border-radius:20px; font-size:0.75rem;">
+                        ${ultimoCierre.modo === 'manana' ? '🟢 Turno 1' : '🟠 Turno 2'}
+                    </span>
+                </div>
+                <hr style="margin:8px 0;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <div><strong>🍰 Pasteles:</strong> <span style="color:#2c3e50;">$${ultimoCierre.total_ventas_pasteles?.toLocaleString('es-ES') || '$0'}</span></div>
+                    <div><strong>🥤 Bebidas:</strong> <span style="color:#2c3e50;">$${ultimoCierre.total_ventas_bebidas?.toLocaleString('es-ES') || '$0'}</span></div>
+                    <div><strong>💰 Efectivo:</strong> <span style="color:#2c3e50;">$${totalEfectivo.toLocaleString('es-ES')}</span></div>
+                    <div><strong>📱 Nequi:</strong> <span style="color:#2c3e50;">$${totalNequi.toLocaleString('es-ES')}</span></div>
+                </div>
+                <div style="margin-top:8px; padding-top:8px; border-top:2px solid #dee2e6; text-align:center;">
+                    <strong style="font-size:1.1rem; color:#c0392b;">💰 Total recaudado: $${totalGeneral.toLocaleString('es-ES')}</strong>
+                </div>
+                ${ultimoCierre.diferencia !== undefined ? `
+                <div style="margin-top:5px; text-align:center; font-size:0.9rem; color:${ultimoCierre.diferencia === 0 ? '#27ae60' : ultimoCierre.diferencia > 0 ? '#e67e22' : '#e74c3c'};">
+                    ${ultimoCierre.diferencia === 0 ? '✅ Caja cuadrada' : ultimoCierre.diferencia > 0 ? `⚠️ Sobrante: +$${ultimoCierre.diferencia.toLocaleString('es-ES')}` : `⚠️ Faltante: -$${Math.abs(ultimoCierre.diferencia).toLocaleString('es-ES')}`}
+                </div>` : ''}
+                <div style="text-align:center; margin-top:8px;">
+                    <a href="pages/historial.html" style="color:#3498db; text-decoration:none; font-size:0.85rem;">📜 Ver todos los cierres</a>
+                </div>
+            </div>
+        `;
+    }
+
+    // ==================== ACTUALIZAR ALERTAS DE STOCK ====================
+    function actualizarAlertasStock() {
+        const container = document.getElementById('alertasStock');
+        
+        try {
+            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            
+            if (productos.length === 0) {
+                container.innerHTML = '<p style="color:#999;">📭 No hay productos registrados</p>';
+                return;
+            }
+            
+            const criticos = productos.filter(p => Number(p.stock) <= Number(p.stock_minimo));
+            
+            if (criticos.length === 0) {
+                container.innerHTML = '<p style="color:#27ae60;">✅ No hay productos con stock crítico</p>';
+                return;
+            }
+            
+            let html = '';
+            criticos.forEach(p => {
+                html += `
+                    <div class="alert-item">
+                        <span>⚠️ <strong>${p.nombre}</strong> - Stock: ${p.stock} (Mínimo: ${p.stock_minimo})</span>
+                        <button class="btn-recibir" onclick="window.location.href='pages/recibir_pedido.html'">📦 Recibir</button>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (e) {
+            console.error('Error al actualizar alertas:', e);
+            container.innerHTML = '<p style="color:#e74c3c;">❌ Error al cargar las alertas</p>';
+        }
+    }
+
+    // ==================== FUNCIÓN DE DEPURACIÓN ====================
+    function debugApertura() {
+        console.log('=== DEBUG APERTURA ===');
+        console.log('📌 pos_apertura_actual_id:', localStorage.getItem('pos_apertura_actual_id'));
+        
+        const aperturasData = localStorage.getItem('pos_aperturas_caja');
+        const aperturas = aperturasData ? JSON.parse(aperturasData) : [];
+        console.log('📊 pos_aperturas_caja:', aperturas);
+        
+        const cierresData = localStorage.getItem('pos_cierres_caja');
+        const cierres = cierresData ? JSON.parse(cierresData) : [];
+        console.log('📊 pos_cierres_caja:', cierres.length, 'cierres');
+        
+        if (cierres.length > 0) {
+            console.log('📌 Último cierre:', cierres[cierres.length - 1]);
+        }
+        
+        const apertura = getAperturaActual();
+        console.log('📌 Resultado getAperturaActual():', apertura);
+        console.log('=== FIN DEBUG ===');
+    }
+
+    // ==================== INICIALIZACIÓN ====================
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 Iniciando POS Pastelería...');
+        actualizarFecha();
+        actualizarEstadoTurno();
+        actualizarDashboard();
+        
+        setTimeout(debugApertura, 1000);
+        
+        setInterval(() => {
+            actualizarEstadoTurno();
+            actualizarDashboard();
+        }, 10000);
+        
+        console.log('✅ POS Pastelería inicializado correctamente');
+        console.log('💡 Para depurar ejecuta: debugApertura() en la consola');
+    });
+
+    // Exponer funciones globales
+    window.actualizarEstadoTurno = actualizarEstadoTurno;
+    window.actualizarDashboard = actualizarDashboard;
+    window.actualizarFecha = actualizarFecha;
+    window.actualizarAlertasStock = actualizarAlertasStock;
+    window.debugApertura = debugApertura;
+    window.obtenerUltimoCierre = obtenerUltimoCierre;
+
+    
+    </script>
+</body>
+</html>

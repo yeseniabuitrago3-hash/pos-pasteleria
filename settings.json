@@ -1,0 +1,23 @@
+{
+    "app_name": "POS Pasteleria - Donde Fer",
+    "window": {
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "maximized": false,
+        "title": "POS Pasteleria - Donde Fer"
+    },
+    "web_server": {
+        "port": 8080,
+        "www_directory": "www",
+        "index_files": ["index.html", "index.php"]
+    },
+    "php": {
+        "executable": "php/php.exe",
+        "ini_file": "php/php.ini"
+    },
+    "debug": {
+        "show_console": true,
+        "show_php_errors": true
+    }
+}

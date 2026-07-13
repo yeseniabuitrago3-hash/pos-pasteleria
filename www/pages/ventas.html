@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ventas - POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+
+
+/* ===== PAGINACIÓN ===== */
+.btn-cargar-mas {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    width: 100%;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+.btn-cargar-mas:hover {
+    background: #5a6268;
+}
+.btn-cargar-mas:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cargando-mas {
+    text-align: center;
+    padding: 10px;
+    color: #666;
+    font-style: italic;
+}
+.lista-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+.lista-container::-webkit-scrollbar {
+    width: 6px;
+}
+.lista-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 10px;
+}
+.lista-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+        .money-input {
+            font-family: monospace;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+        }
+        .scanner-input {
+            font-family: monospace;   
+            font-size: 1.1rem;
+        }
+        .btn-devolucion-active {
+            background-color: #dc3545 !important;
+            color: white !important;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+        .pastel-card, .bebida-card, .nequi-card {
+            background: #f8f9fa;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #4A71C9;
+        }
+        .pastel-card {
+            border-left-color: #f39c12;
+        }
+        .bebida-card {
+            border-left-color: #2ecc71;
+        }
+        .nequi-card {
+            border-left-color: #9b59b6;
+        }
+        .btn-devolver {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .btn-devolver:hover {
+            background: #2ecc71;
+        }
+        .btn-eliminar {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-eliminar:hover {
+            background: #c0392b;
+        }
+        .btn-acciones {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .producto-info {
+            flex: 1;
+        }
+        .producto-precio {
+            font-weight: bold;
+            min-width: 80px;
+            text-align: right;
+        }
+        .devuelto-badge {
+            background: #e67e22;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-left: 5px;
+        }
+        .alert-success { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin: 5px 0; }
+        .alert-error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin: 5px 0; }
+        .alert-info { background: #d1ecf1; color: #0c5460; padding: 10px; border-radius: 5px; margin: 5px 0; }
+        .venta-parcialmente-devuelta {
+            opacity: 0.7;
+            border-left-color: #e67e22 !important;
+        }
+        .venta-totalmente-devuelta {
+            opacity: 0.4;
+            border-left-color: #e74c3c !important;
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> Pastelería donde Fer - Ventas</h1>
+            <div class="fecha" id="fechaActual"></div>
+        </div>
+
+        <nav class="main-nav">
+            <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+            <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+            <button onclick="window.location.href='ventas.html'" class="nav-btn nav-btn-active">💰 Ventas</button>
+            <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+            <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+            <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+            <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn">📥 Recibir Pedido</button>
+            <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn">📈 Análisis</button>
+        </nav>
+
+        <div id="alertContainer"></div>
+
+        <div class="dashboard ventas-grid">
+            <!-- Pasteles -->
+            <section class="card sales-card" id="card-pasteles">
+                <h3>🍰 Pasteles ($2.000 c/u)</h3>
+                <div class="form-group">
+                    <label>Cantidad de pasteles:</label>
+                    <input type="text" id="cantidadPasteles" class="money-input" 
+                           placeholder="Ej: 5" 
+                           oninput="formatearNumeroEntero(this)"
+                           onblur="formatearNumeroEnteroCompleto(this)">
+                </div>
+                <button onclick="agregarPastel()" class="btn btn-primary btn-full">➕ Agregar pastel</button>
+                
+                <div class="section-block">
+                    <h4>Vendidos:</h4>
+                    <div id="listaPastelesVendidos"></div>
+                </div>
+            </section>
+            
+            <!-- Bebidas -->
+            <section class="card sales-card" id="card-bebidas">
+                <h3>🥤 Bebidas / Gaseosas</h3>
+                <div class="form-group">
+                    <label>Código del producto:</label>
+                    <input type="text" id="scannerInput" class="scanner-input" 
+                           placeholder="Escanea el código de barras" autofocus>
+                </div>
+                <div class="form-group">
+                    <button id="btnModoDevolucion" class="btn btn-devolucion btn-full" onclick="toggleModoDevolucion()">🔄 Modo Devolución: OFF</button>
+                </div>
+              <div class="form-group" style="display: flex; gap: 10px; align-items: center;">
+    <button id="btnToggleSonido" class="btn" style="background: #27ae60; color: white; flex: 1;">
+        🔊 Sonido: ON
+    </button>
+</div>
+                
+                <div class="section-block">
+                    <h4>Productos vendidos:</h4>
+                    <div id="listaBebidasVendidas"></div>
+                </div>
+            </section>
+            
+            <!-- Nequi -->
+            <section class="card sales-card" id="card-nequi">
+                <h3>📱 Transferencias Nequi</h3>
+                <div class="form-group">
+                    <label>Monto:</label>
+                    <input type="text" id="montoNequi" class="money-input" 
+                           placeholder="Ej: 15.000"
+                           oninput="formatearNumero(this)"
+                           onblur="formatearNumeroCompleto(this)">
+                </div>
+                <div class="form-group">
+                    <label>Referencia:</label>
+                    <input type="text" id="refNequi" placeholder="Opcional">
+                </div>
+                <button onclick="agregarTransferenciaNequi()" class="btn btn-primary btn-full">➕ Registrar Nequi</button>
+                
+                <div class="section-block">
+                    <h4>Transferencias registradas:</h4>
+                    <div id="listaTransferenciasNequi"></div>
+                </div>
+            </section>
+        </div>
+        
+        <!-- Totales -->
+        <div class="card">
+            <h3>💰 Totales del día</h3>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:15px;">
+                <div><p><strong>Pasteles:</strong></p><p id="totalPasteles">$0</p></div>
+                <div><p><strong>Bebidas efectivo:</strong></p><p id="totalBebidas">$0</p></div>
+                <div><p><strong>Total Nequi:</strong></p><p id="totalNequi">$0</p></div>
+            </div>
+        </div>
+        
+        <div style="margin-top:20px; display:flex; gap:10px;">
+            <button onclick="window.location.href='../index.html'" class="btn">⬅️ Volver</button>
+            <button onclick="window.location.href='cierre.html'" class="btn btn-success">📊 Ir a cierre</button>
+        </div>
+    </div>
+    
+    <!-- Modal Devolución -->
+    <div id="modalDevolucion" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+        <div style="background:#fff; padding:18px; border-radius:8px; width:320px; box-shadow:0 6px 18px rgba(0,0,0,0.2);">
+            <h3 style="margin-top:0;">↺ Registrar devolución</h3>
+            <div style="margin-bottom:8px;"><strong id="devProductoNombre">Producto</strong></div>
+            <div class="form-group">
+                <label>Cantidad máxima a devolver:</label>
+                <div id="devCantidadMax">0</div>
+            </div>
+            <div class="form-group">
+                <label>Ingrese cantidad a devolver:</label>
+                <input type="number" id="devCantidad" min="1" value="1" style="width:100%; padding:8px;">
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="devRestock" checked> Reingresar al stock</label>
+            </div>
+            <div class="form-group">
+                <label>Motivo:</label>
+                <select id="devMotivo" style="width:100%; padding:8px;">
+                    <option>Cliente</option>
+                    <option>Error de digitación</option>
+                    <option>Producto dañado</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                <button class="btn" onclick="closeDevolucionModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmarDevolucion()">Confirmar devolución</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Nequi -->
+    <div id="modalEliminarNequi" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+        <div style="background:#fff; padding:20px; border-radius:8px; width:340px;">
+            <h3 style="margin-top:0; color:#e74c3c;">⚠️ Eliminar Transferencia</h3>
+            <p>¿Estás seguro de que deseas eliminar esta transferencia Nequi?</p>
+            <div style="background:#f5f5f5; padding:12px; border-radius:6px; margin:15px 0;">
+                <p><strong>Monto:</strong> $<span id="nequiEliminarMonto">0</span></p>
+                <p><strong>Hora:</strong> <span id="nequiEliminarHora">--:--:--</span></p>
+                <p><strong>Referencia:</strong> <span id="nequiEliminarRef">-</span></p>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button class="btn" onclick="closeEliminarNequiModal()">Cancelar</button>
+                <button class="btn" onclick="confirmarEliminarNequi()" style="background:#e74c3c; color:white;">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Venta -->
+    <div id="modalEliminarVenta" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+        <div style="background:#fff; padding:20px; border-radius:8px; width:340px;">
+            <h3 style="margin-top:0; color:#e74c3c;">⚠️ Eliminar Venta</h3>
+            <p>¿Estás seguro de que deseas eliminar esta venta?</p>
+            <div style="background:#f5f5f5; padding:12px; border-radius:6px; margin:15px 0;">
+                <p><strong>Producto:</strong> <span id="ventaEliminarNombre">-</span></p>
+                <p><strong>Cantidad:</strong> <span id="ventaEliminarCantidad">0</span> ud</p>
+                <p><strong>Monto:</strong> $<span id="ventaEliminarMonto">0</span></p>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button class="btn" onclick="closeEliminarVentaModal()">Cancelar</button>
+                <button class="btn" onclick="confirmarEliminarVenta()" style="background:#e74c3c; color:white;">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+
+
+// ==================== SISTEMA DE SONIDO PARA VENTAS ====================
+class SistemaSonidoVentas {
+    constructor() {
+        this.sonidos = {};
+        this.audioContext = null;
+        this.sonidoHabilitado = true;
+        this.inicializarSonidos();
+    }
+
+    // 1. Crear sonidos usando Web Audio API (sin archivos externos)
+    inicializarSonidos() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Sonido: VENTA EXITOSA (sonido alegre)
+            this.sonidos.exito = this.crearSonidoExito();
+            
+            // Sonido: ERROR (sonido grave)
+            this.sonidos.error = this.crearSonidoError();
+            
+            // Sonido: PRODUCTO NO ENCONTRADO
+            this.sonidos.noEncontrado = this.crearSonidoNoEncontrado();
+            
+            console.log('✅ Sistema de sonidos inicializado');
+        } catch (e) {
+            console.warn('⚠️ No se pudo inicializar el sistema de audio:', e);
+            this.sonidoHabilitado = false;
+        }
+    }
+
+    // 2. Crear sonido de ÉXITO (venta registrada)
+    crearSonidoExito() {
+        return function() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Nota 1: Do (523 Hz)
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.frequency.value = 523;
+                osc1.type = 'sine';
+                gain1.gain.value = 0.3;
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(ctx.currentTime);
+                osc1.stop(ctx.currentTime + 0.15);
+                
+                // Nota 2: Mi (659 Hz) - 0.15 segundos después
+                setTimeout(() => {
+                    const osc2 = ctx.createOscillator();
+                    const gain2 = ctx.createGain();
+                    osc2.frequency.value = 659;
+                    osc2.type = 'sine';
+                    gain2.gain.value = 0.3;
+                    osc2.connect(gain2);
+                    gain2.connect(ctx.destination);
+                    osc2.start(ctx.currentTime);
+                    osc2.stop(ctx.currentTime + 0.15);
+                }, 150);
+                
+                // Nota 3: Sol (784 Hz) - 0.3 segundos después
+                setTimeout(() => {
+                    const osc3 = ctx.createOscillator();
+                    const gain3 = ctx.createGain();
+                    osc3.frequency.value = 784;
+                    osc3.type = 'sine';
+                    gain3.gain.value = 0.3;
+                    osc3.connect(gain3);
+                    gain3.connect(ctx.destination);
+                    osc3.start(ctx.currentTime);
+                    osc3.stop(ctx.currentTime + 0.2);
+                }, 300);
+            } catch (e) {
+                console.warn('Error reproduciendo sonido de éxito:', e);
+            }
+        };
+    }
+
+    // 3. Crear sonido de ERROR (venta fallida)
+    crearSonidoError() {
+        return function() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Sonido grave (200 Hz)
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.frequency.value = 200;
+                osc.type = 'sawtooth';
+                gain.gain.value = 0.3;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.3);
+            } catch (e) {
+                console.warn('Error reproduciendo sonido de error:', e);
+            }
+        };
+    }
+
+    // 4. Crear sonido de PRODUCTO NO ENCONTRADO
+    crearSonidoNoEncontrado() {
+        return function() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Dos tonos graves descendentes
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.frequency.value = 400;
+                osc1.type = 'sine';
+                gain1.gain.value = 0.3;
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(ctx.currentTime);
+                osc1.stop(ctx.currentTime + 0.15);
+                
+                setTimeout(() => {
+                    const osc2 = ctx.createOscillator();
+                    const gain2 = ctx.createGain();
+                    osc2.frequency.value = 300;
+                    osc2.type = 'sine';
+                    gain2.gain.value = 0.3;
+                    osc2.connect(gain2);
+                    gain2.connect(ctx.destination);
+                    osc2.start(ctx.currentTime);
+                    osc2.stop(ctx.currentTime + 0.2);
+                }, 200);
+            } catch (e) {
+                console.warn('Error reproduciendo sonido de no encontrado:', e);
+            }
+        };
+    }
+
+    // 5. Reproducir sonido de VENTA EXITOSA
+    playExito() {
+        if (!this.sonidoHabilitado) return;
+        try {
+            if (this.sonidos.exito) this.sonidos.exito();
+        } catch (e) {
+            console.warn('Error:', e);
+        }
+    }
+
+    // 6. Reproducir sonido de ERROR
+    playError() {
+        if (!this.sonidoHabilitado) return;
+        try {
+            if (this.sonidos.error) this.sonidos.error();
+        } catch (e) {
+            console.warn('Error:', e);
+        }
+    }
+
+    // 7. Reproducir sonido de NO ENCONTRADO
+    playNoEncontrado() {
+        if (!this.sonidoHabilitado) return;
+        try {
+            if (this.sonidos.noEncontrado) this.sonidos.noEncontrado();
+        } catch (e) {
+            console.warn('Error:', e);
+        }
+    }
+
+    // 8. Alternar sonido ON/OFF
+    toggleSonido() {
+        this.sonidoHabilitado = !this.sonidoHabilitado;
+        console.log(`🔊 Sonido: ${this.sonidoHabilitado ? 'ON' : 'OFF'}`);
+        return this.sonidoHabilitado;
+    }
+}
+
+// Crear instancia global
+const sistemaSonido = new SistemaSonidoVentas();
+
+    // ==================== BASE DE DATOS LOCAL (localStorage) ====================
+    const DB = {
+        get: function(key) {
+            try {
+                const data = localStorage.getItem('pos_' + key);
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                console.error('Error en DB.get:', e);
+                return [];
+            }
+        },
+        set: function(key, data) {
+            try {
+                localStorage.setItem('pos_' + key, JSON.stringify(data));
+                return true;
+            } catch (e) {
+                console.error('Error en DB.set:', e);
+                return false;
+            }
+        },
+        add: function(key, item) {
+            try {
+                const items = this.get(key);
+                item.id = Date.now() + Math.random() * 1000;
+                items.push(item);
+                this.set(key, items);
+                return item;
+            } catch (e) {
+                console.error('Error en DB.add:', e);
+                return null;
+            }
+        },
+        delete: function(key, id) {
+            try {
+                const items = this.get(key);
+                const filtered = items.filter(item => item.id != id);
+                this.set(key, filtered);
+                return true;
+            } catch (e) {
+                console.error('Error en DB.delete:', e);
+                return false;
+            }
+        }
+    };
+
+// ==================== CONTROL DE SONIDO (FUNCIÓN GLOBAL) ====================
+function toggleSonido() {
+    // Alternar el estado del sonido
+    const estado = sistemaSonido.toggleSonido();
+    const btn = document.getElementById('btnToggleSonido');
+    
+    if (btn) {
+        if (estado) {
+            // SONIDO ON - Verde
+            btn.textContent = '🔊 Sonido: ON';
+            btn.style.background = '#27ae60';  // Verde
+            btn.style.color = 'white';
+            btn.style.border = '2px solid #1e8449';
+        } else {
+            // SONIDO OFF - Rojo
+            btn.textContent = '🔇 Sonido: OFF';
+            btn.style.background = '#e74c3c';  // Rojo
+            btn.style.color = 'white';
+            btn.style.border = '2px solid #c0392b';
+        }
+        mostrarMensaje(`🔊 Sonido ${estado ? 'activado' : 'desactivado'}`, 'info');
+    }
+}
+
+// ==================== CONFIGURAR BOTÓN DE SONIDO AL INICIALIZAR ====================
+// Esta función se ejecuta cuando la página carga
+document.addEventListener('DOMContentLoaded', function() {
+    // ... tu código existente ...
+    
+    // Configurar el botón de sonido
+    const btnSonido = document.getElementById('btnToggleSonido');
+    if (btnSonido) {
+        // Estado inicial: ON (verde)
+        btnSonido.textContent = '🔊 Sonido: ON';
+        btnSonido.style.background = '#27ae60';
+        btnSonido.style.color = 'white';
+        btnSonido.style.border = '2px solid #1e8449';
+        btnSonido.style.cursor = 'pointer';
+        btnSonido.style.padding = '10px 20px';
+        btnSonido.style.borderRadius = '8px';
+        btnSonido.style.fontSize = '1rem';
+        btnSonido.style.fontWeight = 'bold';
+        btnSonido.style.transition = 'all 0.3s ease';
+        
+        // Agregar evento de clic
+        btnSonido.addEventListener('click', toggleSonido);
+        
+        // Efecto hover
+        btnSonido.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.02)';
+        });
+        btnSonido.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    }
+});
+    // ==================== FUNCIÓN PARA OBTENER APERTURA ACTUAL ====================
+    function getAperturaActual() {
+        try {
+            const aperturaId = localStorage.getItem('pos_apertura_actual_id');
+            if (aperturaId) {
+                const aperturas = DB.get('aperturas_caja');
+                const apertura = aperturas.find(a => parseInt(a.id) === parseInt(aperturaId) && a.estado === 'abierta');
+                if (apertura) return apertura;
+            }
+            
+            const aperturas = DB.get('aperturas_caja');
+            const aperturaAbierta = aperturas.find(a => a.estado === 'abierta');
+            if (aperturaAbierta) {
+                localStorage.setItem('pos_apertura_actual_id', aperturaAbierta.id);
+                return aperturaAbierta;
+            }
+            
+            return null;
+        } catch (e) {
+            console.error('Error al obtener apertura:', e);
+            return null;
+        }
+    }
+
+    // ==================== FUNCIÓN VENDER PASTEL ====================
+    function venderPastel(cantidad, aperturaId) {
+        try {
+            console.log('🍰 VENDIENDO PASTELES:', cantidad, 'en apertura:', aperturaId);
+            const cantidadNumerica = parseInt(cantidad) || 0;
+            
+            if (cantidadNumerica <= 0) {
+                mostrarMensaje('❌ Cantidad inválida', 'error');
+                return null;
+            }
+            
+            const venta = {
+                id: Date.now() + Math.random() * 1000,
+                apertura_id: parseInt(aperturaId),
+                cantidad: cantidadNumerica,
+                fecha: new Date().toISOString(),
+                precio_unitario: 2000,
+                subtotal: cantidadNumerica * 2000,
+                tipo: 'pastel'
+            };
+            
+            const ventasPasteles = DB.get('ventas_pasteles');
+            ventasPasteles.push(venta);
+            DB.set('ventas_pasteles', ventasPasteles);
+            console.log('✅ Pasteles guardados:', ventasPasteles.length);
+            
+            return venta;
+        } catch (e) {
+            console.error('Error en venderPastel:', e);
+            mostrarMensaje('❌ Error al guardar la venta: ' + e.message, 'error');
+            return null;
+        }
+    }
+
+    // ==================== FUNCIÓN VENDER BEBIDA ====================
+    function venderBebida(aperturaId, producto) {
+        try {
+            console.log('🥤 VENDIENDO BEBIDA:', producto.nombre, 'en apertura:', aperturaId);
+            
+            const venta = {
+                id: Date.now() + Math.random() * 1000,
+                apertura_id: parseInt(aperturaId),
+                producto_id: parseInt(producto.id),
+                cantidad: 1,
+                precio: producto.precio || 0,
+                subtotal: producto.precio || 0,
+                fecha: new Date().toISOString(),
+                tipo: 'bebida'
+            };
+            
+            const ventasBebidas = DB.get('ventas_bebidas');
+            ventasBebidas.push(venta);
+            DB.set('ventas_bebidas', ventasBebidas);
+            console.log('✅ Bebidas guardadas:', ventasBebidas.length);
+            
+            return venta;
+        } catch (e) {
+            console.error('Error en venderBebida:', e);
+            return null;
+        }
+    }
+
+    // ==================== AGREGAR PASTEL ====================
+   
+    // ==================== AGREGAR PASTEL (ACTUALIZADO) ====================
+function agregarPastel() {
+    console.log('🔄 Botón AGREGAR PASTEL presionado');
+    
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        mostrarMensaje('⚠️ No puedes registrar ventas sin un turno de apertura activo.', 'error');
+        return;
+    }
+    
+    const cantidadInput = document.getElementById('cantidadPasteles');
+    let cantidad = parseInt(cantidadInput.value.replace(/[^0-9]/g, '')) || 0;
+    
+    if (cantidad <= 0) {
+        mostrarMensaje('⚠️ Por favor, ingresa una cantidad válida de pasteles.', 'error');
+        return;
+    }
+    
+    const venta = venderPastel(cantidad, apertura.id);
+    
+    if (venta) {
+        const totalVenta = cantidad * 2000;
+        mostrarMensaje(`🍰 Se registraron ${cantidad} pasteles por $${totalVenta.toLocaleString('es-CO')}.`, 'success');
+        cantidadInput.value = '';
+        // Al agregar, mostrar desde el principio para ver lo nuevo
+        actualizarListaPasteles(true);
+        actualizarTotales();
+    }
+}
+
+// ==================== AGREGAR TRANSFERENCIA NEQUI (ACTUALIZADO) ====================
+function agregarTransferenciaNequi() {
+    console.log('🔄 Botón REGISTRAR NEQUI presionado');
+    
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        mostrarMensaje('⚠️ No puedes registrar transferencias sin un turno activo.', 'error');
+        return;
+    }
+    
+    const montoInput = document.getElementById('montoNequi');
+    let monto = parseInt(montoInput.value.replace(/[^0-9]/g, '')) || 0;
+    const referencia = document.getElementById('refNequi').value.trim();
+    
+    if (monto <= 0) {
+        mostrarMensaje('⚠️ Por favor, ingresa un monto válido para la transferencia.', 'error');
+        return;
+    }
+    
+    const nuevaTransferencia = {
+        id: Date.now() + Math.random() * 1000,
+        apertura_id: parseInt(apertura.id),
+        monto: monto,
+        referencia: referencia || 'Sin referencia',
+        fecha: new Date().toISOString(),
+        usuario: apertura.responsable || 'sistema'
+    };
+    
+    const transferencias = DB.get('transferencias_nequi');
+    transferencias.push(nuevaTransferencia);
+    DB.set('transferencias_nequi', transferencias);
+    
+    mostrarMensaje(`📱 Transferencia de $${monto.toLocaleString('es-CO')} registrada.`, 'success');
+    
+    montoInput.value = '';
+    document.getElementById('refNequi').value = '';
+    
+    // Al agregar, mostrar desde el principio
+    actualizarListaNequi(true);
+    actualizarTotales();
+}
+
+
+   function actualizarListaPasteles() {
+    const container = document.getElementById('listaPastelesVendidos');
+    if (!container) {
+        console.error('❌ Contenedor listaPastelesVendidos no encontrado');
+        return;
+    }
+    
+    console.log('🔄 ACTUALIZANDO LISTA DE PASTELES...');
+    
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        container.innerHTML = '<div class="empty-state">📭 No hay turno activo</div>';
+        return;
+    }
+    
+    // OBTENER DATOS FRESCOS DIRECTAMENTE DE localStorage
+    let ventasPasteles = [];
+    let devoluciones = [];
+    
+    try {
+        const ventasData = localStorage.getItem('pos_ventas_pasteles');
+        ventasPasteles = ventasData ? JSON.parse(ventasData) : [];
+        
+        const devolucionesData = localStorage.getItem('pos_devoluciones');
+        devoluciones = devolucionesData ? JSON.parse(devolucionesData) : [];
+    } catch (e) {
+        console.error('Error al leer datos:', e);
+        ventasPasteles = [];
+        devoluciones = [];
+    }
+    
+    console.log('📊 Ventas pasteles (raw):', ventasPasteles);
+    
+    // Filtrar ventas del turno actual - USAR NÚMERO EN VEZ DE STRING
+    const aperturaIdNum = Number(apertura.id);
+    const ventasDelTurno = ventasPasteles.filter(v => {
+        const vAperturaId = Number(v.apertura_id);
+        return vAperturaId === aperturaIdNum;
+    });
+    
+    console.log('📊 Ventas del turno (ID:', aperturaIdNum, '):', ventasDelTurno);
+    
+    if (ventasDelTurno.length === 0) {
+        container.innerHTML = '<div class="empty-state">🍰 No hay pasteles vendidos</div>';
+        return;
+    }
+    
+    let html = '';
+    
+    ventasDelTurno.forEach(venta => {
+        const ventaId = Number(venta.id);
+        
+        // Buscar devoluciones que coincidan con esta venta
+        const devueltoTotal = devoluciones
+            .filter(d => {
+                const dVentaId = Number(d.ventaId);
+                return dVentaId === ventaId && !d.anulada;
+            })
+            .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+        
+        const disponible = Math.max(0, (venta.cantidad || 0) - devueltoTotal);
+        const totalVenta = venta.cantidad * 2000;
+        const totalActual = disponible * 2000;
+        
+        let claseVenta = 'pastel-card';
+        let badgeDevolucion = '';
+        let textoMonto = '';
+        let infoDevolucion = '';
+        
+        if (devueltoTotal > 0 && disponible > 0) {
+            claseVenta += ' venta-parcialmente-devuelta';
+            badgeDevolucion = `<span class="devuelto-badge">${devueltoTotal} devueltos</span>`;
+            textoMonto = `$${totalActual.toLocaleString('es-CO')}`;
+            infoDevolucion = `<br><small style="color:#e67e22;">↺ Devuelto: ${devueltoTotal} unidades</small>`;
+        } else if (devueltoTotal > 0 && disponible === 0) {
+            claseVenta += ' venta-totalmente-devuelta';
+            badgeDevolucion = `<span class="devuelto-badge">TOTAL DEVUELTO</span>`;
+            textoMonto = `<span style="text-decoration:line-through;">$${totalVenta.toLocaleString('es-CO')}</span>`;
+            infoDevolucion = `<br><small style="color:#e74c3c;">↺ Total devuelto</small>`;
+        } else {
+            textoMonto = `$${totalVenta.toLocaleString('es-CO')}`;
+        }
+        
+        // Fecha formateada
+        const fechaVenta = new Date(venta.fecha);
+        const horaStr = fechaVenta.toLocaleTimeString('es-CO', { 
+            hour: 'numeric', 
+            minute: '2-digit', 
+            second: '2-digit', 
+            hour12: true 
+        });
+        
+        const botonDevolver = disponible > 0 ? 
+            `<button class="btn-devolver" onclick="openDevolucionModal('${venta.id}', 0, 'Pastel', 2000, ${disponible}, ${apertura.id})">🔄 Devolver</button>` : 
+            '';
+        
+        html += `
+            <div class="${claseVenta}">
+                <div class="producto-info">
+                    <strong>${disponible} unidades</strong>
+                    ${badgeDevolucion}
+                    <br>
+                    <small>${horaStr}</small>
+                    ${infoDevolucion}
+                </div>
+                <div>
+                    <div class="producto-precio">${textoMonto}</div>
+                    <div class="btn-acciones">
+                        ${botonDevolver}
+                        <button class="btn-eliminar" onclick="eliminarVenta(${venta.id}, 0)">🗑️ Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    console.log('✅ Lista de pasteles actualizada con', ventasDelTurno.length, 'ventas');
+}
+
+    // ==================== ACTUALIZAR LISTA BEBIDAS CON PAGINACIÓN ====================
+// Variables para controlar la paginación de bebidas
+let offsetBebidas = 0;
+const LIMITE_BEBIDAS = 7;
+let totalBebidas = 0;
+let todasLasBebidas = [];
+
+function actualizarListaBebidas(resetOffset = true) {
+    const container = document.getElementById('listaBebidasVendidas');
+    if (!container) return;
+    
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        container.innerHTML = '<div class="empty-state">📭 No hay turno activo</div>';
+        return;
+    }
+    
+    const productos = DB.get('productos');
+    const ventasBebidas = DB.get('ventas_bebidas');
+    const devoluciones = DB.get('devoluciones') || [];
+    
+    // Obtener todas las ventas del turno
+    todasLasBebidas = ventasBebidas.filter(v => parseInt(v.apertura_id) === parseInt(apertura.id));
+    totalBebidas = todasLasBebidas.length;
+    
+    if (resetOffset) {
+        offsetBebidas = 0;
+    }
+    
+    if (totalBebidas === 0) {
+        container.innerHTML = '<div class="empty-state">🥤 No hay bebidas vendidas</div>';
+        return;
+    }
+    
+    // Calcular cuántas mostrar
+    const fin = Math.min(offsetBebidas + LIMITE_BEBIDAS, totalBebidas);
+    const ventasMostrar = todasLasBebidas.slice(0, fin);
+    const hayMas = fin < totalBebidas;
+    
+    let html = `<div class="lista-container">`;
+    
+    ventasMostrar.forEach(venta => {
+        const devueltoTotal = devoluciones
+            .filter(d => d.ventaId === venta.id && !d.anulada)
+            .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+        
+        const disponible = (venta.cantidad || 1) - devueltoTotal;
+        const producto = productos.find(p => parseInt(p.id) === parseInt(venta.producto_id));
+        const nombre = producto ? producto.nombre : 'Desconocido';
+        const precio = producto ? producto.precio : 0;
+        
+        let claseVenta = 'bebida-card';
+        let badgeDevolucion = '';
+        
+        if (devueltoTotal > 0 && disponible > 0) {
+            claseVenta += ' venta-parcialmente-devuelta';
+            badgeDevolucion = `<span class="devuelto-badge">Devuelto</span>`;
+        } else if (devueltoTotal > 0 && disponible === 0) {
+            claseVenta += ' venta-totalmente-devuelta';
+            badgeDevolucion = `<span class="devuelto-badge">TOTAL DEVUELTO</span>`;
+        }
+        
+        const horaStr = new Date(venta.fecha).toLocaleTimeString('es-CO', { 
+            hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true 
+        });
+        
+        html += `
+            <div class="${claseVenta}">
+                <div class="producto-info">
+                    <strong>${nombre}</strong>
+                    ${badgeDevolucion}
+                    <br>
+                    <small>${horaStr}</small>
+                    ${disponible <= 0 ? '<br><small style="color:#e74c3c;">↺ Devuelto</small>' : ''}
+                </div>
+                <div>
+                    <div class="producto-precio">$${venta.subtotal.toLocaleString('es-CO')}</div>
+                    <div class="btn-acciones">
+                        ${disponible > 0 ? `<button class="btn-devolver" onclick="openDevolucionModal(${venta.id}, ${venta.producto_id}, '${nombre}', ${precio}, ${disponible}, ${apertura.id})">🔄 Devolver</button>` : ''}
+                        <button class="btn-eliminar" onclick="eliminarVenta(${venta.id}, ${venta.producto_id})">🗑️ Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `</div>`;
+    
+    // Botón "Cargar más"
+    if (hayMas) {
+        const restantes = totalBebidas - fin;
+        html += `
+            <button class="btn-cargar-mas" onclick="cargarMasBebidas()">
+                📥 Cargar más (${restantes} restantes)
+            </button>
+        `;
+    } else if (totalBebidas > LIMITE_BEBIDAS) {
+        html += `
+            <div style="text-align:center; padding:8px; color:#666; font-size:0.9rem;">
+                ✅ Mostrando todos los ${totalBebidas} registros
+            </div>
+        `;
+    }
+    
+    // Mostrar contador
+    const contador = totalBebidas > 0 ? 
+        `<div style="font-size:0.8rem; color:#666; margin-bottom:8px;">📊 ${totalBebidas} registros (mostrando ${Math.min(fin, totalBebidas)})</div>` : '';
+    
+    container.innerHTML = contador + html;
+}
+
+// ===== FUNCIÓN PARA CARGAR MÁS BEBIDAS =====
+function cargarMasBebidas() {
+    offsetBebidas += LIMITE_BEBIDAS;
+    actualizarListaBebidas(false);
+}
+
+
+    // ==================== ACTUALIZAR LISTA NEQUI ====================
+   // ==================== ACTUALIZAR LISTA NEQUI CON PAGINACIÓN ====================
+// Variables para controlar la paginación de Nequi
+let offsetNequi = 0;
+const LIMITE_NEQUI = 7;
+let totalNequi = 0;
+let todasLasTransferencias = [];
+
+function actualizarListaNequi(resetOffset = true) {
+    const container = document.getElementById('listaTransferenciasNequi');
+    if (!container) return;
+    
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        container.innerHTML = '<div class="empty-state">📭 No hay turno activo</div>';
+        return;
+    }
+    
+    const transferencias = DB.get('transferencias_nequi');
+    todasLasTransferencias = transferencias.filter(t => parseInt(t.apertura_id) === parseInt(apertura.id));
+    totalNequi = todasLasTransferencias.length;
+    
+    if (resetOffset) {
+        offsetNequi = 0;
+    }
+    
+    if (totalNequi === 0) {
+        container.innerHTML = '<div class="empty-state">📱 No hay transferencias registradas</div>';
+        return;
+    }
+    
+    // Calcular cuántas mostrar
+    const fin = Math.min(offsetNequi + LIMITE_NEQUI, totalNequi);
+    const transferenciasMostrar = todasLasTransferencias.slice(0, fin);
+    const hayMas = fin < totalNequi;
+    
+    let html = `<div class="lista-container">`;
+    
+    transferenciasMostrar.forEach(t => {
+        const fecha = new Date(t.fecha);
+        const hora = fecha.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+        html += `
+            <div class="nequi-card">
+                <div class="producto-info">
+                    <strong>$${t.monto.toLocaleString('es-CO')}</strong>
+                    <br>
+                    <small>${hora} | Ref: ${t.referencia || 'Sin referencia'}</small>
+                </div>
+                <div>
+                    <button class="btn-eliminar" onclick="eliminarNequi(${t.id})">🗑️ Eliminar</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `</div>`;
+    
+    // Botón "Cargar más"
+    if (hayMas) {
+        const restantes = totalNequi - fin;
+        html += `
+            <button class="btn-cargar-mas" onclick="cargarMasNequi()">
+                📥 Cargar más (${restantes} restantes)
+            </button>
+        `;
+    } else if (totalNequi > LIMITE_NEQUI) {
+        html += `
+            <div style="text-align:center; padding:8px; color:#666; font-size:0.9rem;">
+                ✅ Mostrando todos los ${totalNequi} registros
+            </div>
+        `;
+    }
+    
+    // Mostrar contador
+    const contador = totalNequi > 0 ? 
+        `<div style="font-size:0.8rem; color:#666; margin-bottom:8px;">📊 ${totalNequi} registros (mostrando ${Math.min(fin, totalNequi)})</div>` : '';
+    
+    container.innerHTML = contador + html;
+}
+
+// ===== FUNCIÓN PARA CARGAR MÁS NEQUI =====
+function cargarMasNequi() {
+    offsetNequi += LIMITE_NEQUI;
+    actualizarListaNequi(false);
+}
+
+    // ==================== ELIMINAR NEQUI ====================
+   // ==================== ELIMINAR NEQUI (ACTUALIZADO) ====================
+function eliminarNequi(nequiId) {
+    if (!confirm('¿Estás seguro de eliminar esta transferencia Nequi?')) return;
+    
+    const transferencias = DB.get('transferencias_nequi');
+    const index = transferencias.findIndex(t => t.id === nequiId);
+    if (index === -1) {
+        mostrarMensaje('❌ Transferencia no encontrada', 'error');
+        return;
+    }
+    
+    const montoEliminado = transferencias[index].monto;
+    transferencias.splice(index, 1);
+    DB.set('transferencias_nequi', transferencias);
+    
+    mostrarMensaje(`✅ Transferencia Nequi de $${montoEliminado.toLocaleString('es-CO')} eliminada`, 'success');
+    
+    // Actualizar manteniendo la posición
+    actualizarListaNequi(false);
+    actualizarTotales();
+}
+
+// ==================== ELIMINAR VENTA (ACTUALIZADO) ====================
+function eliminarVenta(ventaId, productoId) {
+    if (!confirm('¿Estás seguro de eliminar esta venta?')) return;
+    
+    if (productoId === 0) {
+        const ventasPasteles = DB.get('ventas_pasteles');
+        const index = ventasPasteles.findIndex(v => v.id === ventaId);
+        if (index !== -1) {
+            ventasPasteles.splice(index, 1);
+            DB.set('ventas_pasteles', ventasPasteles);
+            mostrarMensaje('✅ Venta de pastel eliminada', 'success');
+        }
+    } else {
+        const ventasBebidas = DB.get('ventas_bebidas');
+        const index = ventasBebidas.findIndex(v => v.id === ventaId);
+        if (index !== -1) {
+            ventasBebidas.splice(index, 1);
+            DB.set('ventas_bebidas', ventasBebidas);
+            mostrarMensaje('✅ Venta de bebida eliminada', 'success');
+        }
+    }
+    
+    actualizarListaPasteles(false);
+    actualizarListaBebidas(false);
+    actualizarTotales();
+}
+
+
+    // ==================== ACTUALIZAR TOTALES ====================
+    function actualizarTotales() {
+        const apertura = getAperturaActual();
+        if (!apertura) {
+            document.getElementById('totalPasteles').textContent = '$0';
+            document.getElementById('totalBebidas').textContent = '$0';
+            document.getElementById('totalNequi').textContent = '$0';
+            return;
+        }
+        
+        const ventasPasteles = DB.get('ventas_pasteles');
+        const ventasBebidas = DB.get('ventas_bebidas');
+        const transferencias = DB.get('transferencias_nequi');
+        const devoluciones = DB.get('devoluciones') || [];
+        
+        let totalPasteles = 0;
+        ventasPasteles.filter(v => parseInt(v.apertura_id) === parseInt(apertura.id)).forEach(v => {
+            const devuelto = devoluciones.filter(d => d.ventaId === v.id && !d.anulada).reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            const cantidadVendida = (v.cantidad || 0) - devuelto;
+            totalPasteles += cantidadVendida * (v.precio_unitario || 2000);
+        });
+        
+        let totalBebidas = 0;
+        ventasBebidas.filter(v => parseInt(v.apertura_id) === parseInt(apertura.id)).forEach(v => {
+            const devuelto = devoluciones.filter(d => d.ventaId === v.id && !d.anulada).reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            const cantidadVendida = (v.cantidad || 1) - devuelto;
+            totalBebidas += cantidadVendida * (v.precio || 0);
+        });
+        
+        const totalNequi = transferencias.filter(t => parseInt(t.apertura_id) === parseInt(apertura.id)).reduce((sum, t) => sum + (t.monto || 0), 0);
+        
+        document.getElementById('totalPasteles').textContent = `$${totalPasteles.toLocaleString('es-CO')}`;
+        document.getElementById('totalBebidas').textContent = `$${totalBebidas.toLocaleString('es-CO')}`;
+        document.getElementById('totalNequi').textContent = `$${totalNequi.toLocaleString('es-CO')}`;
+    }
+
+
+
+
+
+    // ==================== ABRIR MODAL DE DEVOLUCIÓN ====================
+function openDevolucionModal(ventaId, productoId, nombre, precio, cantidadDisponible, aperturaId) {
+    console.log('🔄 Abriendo modal de devolución para venta:', ventaId);
+    console.log('📊 Datos:', { ventaId, productoId, nombre, precio, cantidadDisponible, aperturaId });
+    
+    const modal = document.getElementById('modalDevolucion');
+    if (!modal) {
+        console.error('❌ Modal no encontrado');
+        return;
+    }
+    
+    document.getElementById('devProductoNombre').textContent = nombre || 'Producto';
+    document.getElementById('devCantidadMax').textContent = cantidadDisponible || 1;
+    document.getElementById('devCantidad').value = 1;
+    document.getElementById('devCantidad').max = cantidadDisponible || 1;
+    document.getElementById('devRestock').checked = true;
+    document.getElementById('devMotivo').value = 'Cliente';
+    
+    modal.dataset.ventaId = ventaId;
+    modal.dataset.productoId = productoId;
+    modal.dataset.precio = precio || 0;
+    modal.dataset.nombre = nombre || '';
+    modal.dataset.aperturaId = aperturaId;
+    modal.dataset.cantidadDisponible = cantidadDisponible || 1;
+    
+    modal.style.display = 'flex';
+    console.log('✅ Modal abierto con datos:', modal.dataset);
+}
+
+// ==================== CERRAR MODAL DE DEVOLUCIÓN ====================
+function closeDevolucionModal() {
+    const modal = document.getElementById('modalDevolucion');
+    if (modal) {
+        modal.style.display = 'none';
+        console.log('✅ Modal cerrado');
+    }
+}
+
+// ==================== CONFIRMAR DEVOLUCIÓN (CORREGIDA - SIN parseINT) ====================
+// ==================== CONFIRMAR DEVOLUCIÓN (CORREGIDA COMPLETAMENTE) ====================
+function confirmarDevolucion() {
+    const modal = document.getElementById('modalDevolucion');
+    if (!modal) return;
+    
+    console.log('🔄 Confirmando devolución...');
+    
+    // Obtener datos del modal
+    const ventaId = modal.dataset.ventaId;
+    const productoId = parseInt(modal.dataset.productoId) || 0;
+    const precio = parseFloat(modal.dataset.precio) || 0;
+    const nombreProducto = modal.dataset.nombre || 'Producto';
+    const cantidad = parseInt(document.getElementById('devCantidad').value, 10);
+    const restock = document.getElementById('devRestock').checked;
+    const motivo = document.getElementById('devMotivo').value;
+    const aperturaId = parseInt(modal.dataset.aperturaId);
+    const cantidadDisponible = parseInt(modal.dataset.cantidadDisponible) || 1;
+    
+    console.log('📊 Datos de devolución:', { 
+        ventaId, productoId, precio, nombreProducto, 
+        cantidad, restock, motivo, aperturaId, cantidadDisponible
+    });
+    
+    // Validaciones
+    if (!ventaId || ventaId === 'undefined' || ventaId === 'null') {
+        mostrarMensaje('❌ ID de venta inválido', 'error');
+        return;
+    }
+    
+    if (isNaN(cantidad) || cantidad <= 0) {
+        mostrarMensaje('❌ Cantidad inválida', 'error');
+        return;
+    }
+    
+    if (cantidad > cantidadDisponible) {
+        mostrarMensaje(`❌ No puedes devolver más de ${cantidadDisponible} unidades`, 'error');
+        return;
+    }
+    
+    try {
+        // ===== 1. BUSCAR LA VENTA ORIGINAL =====
+        let ventaEncontrada = null;
+        let ventasBebidas = DB.get('ventas_bebidas');
+        let ventasPasteles = DB.get('ventas_pasteles');
+        
+        // Buscar en ventas de bebidas
+        let indexBebida = ventasBebidas.findIndex(v => String(v.id) === String(ventaId));
+        if (indexBebida !== -1) {
+            ventaEncontrada = ventasBebidas[indexBebida];
+            console.log('✅ Venta de bebida encontrada:', ventaEncontrada);
+        }
+        
+        // Si no está en bebidas, buscar en pasteles
+        if (!ventaEncontrada) {
+            let indexPastel = ventasPasteles.findIndex(v => String(v.id) === String(ventaId));
+            if (indexPastel !== -1) {
+                ventaEncontrada = ventasPasteles[indexPastel];
+                console.log('✅ Venta de pastel encontrada:', ventaEncontrada);
+            }
+        }
+        
+        if (!ventaEncontrada) {
+            mostrarMensaje('❌ No se encontró la venta original', 'error');
+            return;
+        }
+        
+        // ===== 2. CREAR REGISTRO DE DEVOLUCIÓN =====
+        const devolucion = {
+            id: Date.now(),
+            ventaId: String(ventaId),
+            productoId: productoId,
+            cantidad: cantidad,
+            motivo: motivo || 'Cliente',
+            restock: restock || false,
+            precio: precio,
+            aperturaId: aperturaId,
+            fecha: new Date().toISOString(),
+            anulada: false
+        };
+        
+        console.log('📝 Guardando devolución:', devolucion);
+        
+        // ===== 3. GUARDAR DEVOLUCIÓN =====
+        const devoluciones = DB.get('devoluciones');
+        devoluciones.push(devolucion);
+        DB.set('devoluciones', devoluciones);
+        
+        // ===== 4. ACTUALIZAR STOCK SI CORRESPONDE =====
+        if (restock && productoId > 0) {
+            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const indexProducto = productos.findIndex(p => Number(p.id) === Number(productoId));
+            
+            if (indexProducto !== -1) {
+                const stockAnterior = productos[indexProducto].stock;
+                productos[indexProducto].stock = stockAnterior + cantidad;
+                localStorage.setItem('pos_productos', JSON.stringify(productos));
+                console.log(`📦 Stock actualizado: ${stockAnterior} → ${productos[indexProducto].stock}`);
+                
+                // Registrar movimiento de stock
+                const movimientos = JSON.parse(localStorage.getItem('pos_movimientos_stock') || '[]');
+                movimientos.push({
+                    id: Date.now(),
+                    producto_id: productoId,
+                    producto_nombre: nombreProducto,
+                    tipo: 'DEVOLUCION',
+                    cantidad: cantidad,
+                    stock_anterior: stockAnterior,
+                    stock_nuevo: stockAnterior + cantidad,
+                    motivo: `Devolución - ${motivo}`,
+                    usuario: localStorage.getItem('pos_apertura_actual_id') || 'Empleado',
+                    fecha: new Date().toISOString(),
+                    hora: new Date().toLocaleTimeString('es-CO')
+                });
+                localStorage.setItem('pos_movimientos_stock', JSON.stringify(movimientos));
+            }
+        }
+        
+        // ===== 5. ELIMINAR O MARCAR LA VENTA ORIGINAL =====
+        // Si la cantidad devuelta es igual a la cantidad total de la venta, ELIMINAR la venta
+        // Si es parcial, solo registrar la devolución y mostrar la venta como parcialmente devuelta
+        
+        const cantidadOriginal = ventaEncontrada.cantidad || 1;
+        const devolucionesExistentes = devoluciones.filter(d => 
+            String(d.ventaId) === String(ventaId) && !d.anulada
+        );
+        const totalDevuelto = devolucionesExistentes.reduce((sum, d) => sum + (d.cantidad || 0), 0);
+        
+        // Si ya se devolvió todo, eliminar la venta
+        if (totalDevuelto >= cantidadOriginal) {
+            // Eliminar de bebidas
+            const idxBebida = ventasBebidas.findIndex(v => String(v.id) === String(ventaId));
+            if (idxBebida !== -1) {
+                ventasBebidas.splice(idxBebida, 1);
+                DB.set('ventas_bebidas', ventasBebidas);
+                console.log('🗑️ Venta de bebida eliminada (devolución total)');
+            }
+            
+            // Eliminar de pasteles
+            const idxPastel = ventasPasteles.findIndex(v => String(v.id) === String(ventaId));
+            if (idxPastel !== -1) {
+                ventasPasteles.splice(idxPastel, 1);
+                DB.set('ventas_pasteles', ventasPasteles);
+                console.log('🗑️ Venta de pastel eliminada (devolución total)');
+            }
+        } else {
+            console.log(`📝 Devolución parcial: ${totalDevuelto}/${cantidadOriginal}`);
+        }
+        
+        // ===== 6. CERRAR MODAL =====
+        closeDevolucionModal();
+        
+        // ===== 7. MOSTRAR MENSAJE =====
+        const mensajeRestock = restock ? ` (Stock reingresado: +${cantidad})` : '';
+        mostrarMensaje(`✅ Devolución: ${cantidad}x ${nombreProducto} por $${(precio * cantidad).toLocaleString('es-CO')}${mensajeRestock}`, 'success');
+        
+        // ===== 8. ACTUALIZAR VISTAS =====
+        console.log('🔄 Actualizando vistas...');
+        actualizarListaPasteles();
+        actualizarListaBebidas();
+        actualizarListaNequi();
+        actualizarTotales();
+        
+        console.log('✅ Devolución completada exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error al procesar devolución:', error);
+        mostrarMensaje('❌ Error al procesar la devolución: ' + error.message, 'error');
+    }
+}
+
+
+// ==================== ELIMINAR VENTA CON DEVOLUCIÓN ====================
+function eliminarVentaConDevolucion(ventaId, productoId, productoNombre, precio, cantidad) {
+    if (!confirm(`¿Eliminar venta de ${cantidad}x ${productoNombre} y devolver al stock?`)) return;
+    
+    try {
+        // 1. Eliminar la venta
+        const ventasBebidas = DB.get('ventas_bebidas');
+        const index = ventasBebidas.findIndex(v => String(v.id) === String(ventaId));
+        if (index !== -1) {
+            ventasBebidas.splice(index, 1);
+            DB.set('ventas_bebidas', ventasBebidas);
+        }
+        
+        // 2. Devolver al stock
+        if (productoId > 0) {
+            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            const idx = productos.findIndex(p => Number(p.id) === Number(productoId));
+            if (idx !== -1) {
+                productos[idx].stock += cantidad;
+                localStorage.setItem('pos_productos', JSON.stringify(productos));
+            }
+        }
+        
+        mostrarMensaje(`✅ Venta eliminada y ${cantidad}x ${productoNombre} devuelto al stock`, 'success');
+        actualizarListaBebidas();
+        actualizarTotales();
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        mostrarMensaje('❌ Error al eliminar venta', 'error');
+    }
+}
+
+   
+    // ==================== MODO DEVOLUCIÓN ====================
+    window.devolucionActiva = false;
+
+    function toggleModoDevolucion() {
+        window.devolucionActiva = !window.devolucionActiva;
+        const btn = document.getElementById('btnModoDevolucion');
+        if (btn) {
+            if (window.devolucionActiva) {
+                btn.classList.add('btn-devolucion-active');
+                btn.textContent = '🔁 Modo Devolución: ON';
+                mostrarMensaje('✅ Modo devolución ACTIVADO', 'success');
+            } else {
+                btn.classList.remove('btn-devolucion-active');
+                btn.textContent = '🔄 Modo Devolución: OFF';
+                mostrarMensaje('❌ Modo devolución desactivado', 'info');
+            }
+        }
+    }
+
+    // ==================== FUNCIONES DE FORMATEO ====================
+    function formatearNumero(input) {
+        let valor = input.value.replace(/[^0-9]/g, '');
+        if (valor === '') { input.value = ''; return; }
+        input.value = parseInt(valor, 10).toLocaleString('es-ES');
+    }
+
+    function formatearNumeroCompleto(input) {
+        let valor = input.value.replace(/[^0-9]/g, '');
+        if (valor === '') { input.value = ''; return; }
+        input.value = parseInt(valor, 10).toLocaleString('es-ES');
+    }
+
+    function formatearNumeroEntero(input) {
+        let valor = input.value.replace(/[^0-9]/g, '');
+        if (valor === '') { input.value = ''; return; }
+        input.value = parseInt(valor, 10).toLocaleString('es-ES');
+    }
+
+    function formatearNumeroEnteroCompleto(input) {
+        let valor = input.value.replace(/[^0-9]/g, '');
+        if (valor === '') { input.value = ''; return; }
+        input.value = parseInt(valor, 10).toLocaleString('es-ES');
+    }
+
+    // ==================== MOSTRAR MENSAJE ====================
+    function mostrarMensaje(texto, tipo = 'info') {
+        const container = document.getElementById('alertContainer');
+        if (!container) return;
+        
+        const clase = tipo === 'success' ? 'alert-success' : 
+                      tipo === 'error' ? 'alert-error' : 'alert-info';
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = clase;
+        alertDiv.style.cssText = 'padding:10px 15px; margin:5px 0; border-radius:5px; display:flex; justify-content:space-between; align-items:center;';
+        alertDiv.innerHTML = `${texto} <button onclick="this.parentElement.remove()" style="background:none; border:none; font-size:18px; cursor:pointer;">✖</button>`;
+        container.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            if (alertDiv.parentElement) alertDiv.remove();
+        }, 4000);
+    }
+
+    function actualizarFecha() {
+        const hoy = new Date();
+        const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const fechaElement = document.getElementById('fechaActual');
+        if (fechaElement) {
+            fechaElement.textContent = hoy.toLocaleDateString('es-ES', opciones);
+        }
+    }
+
+  // ==================== PROCESAR ESCÁNER CON SONIDO ====================
+function procesarProductoEscaneado(codigo) {
+    console.log('📡 Escaneado código:', codigo);
+    
+    // 1. Obtener productos del localStorage
+    const productos = DB.get('productos');
+    if (!productos || productos.length === 0) {
+        mostrarMensaje('❌ No hay productos registrados en el inventario', 'error');
+        sistemaSonido.playError(); // 🔊 SONIDO DE ERROR
+        return;
+    }
+    
+    // 2. Buscar producto por código
+    const codigoBuscado = codigo.trim().toUpperCase();
+    const producto = productos.find(p => {
+        const codigoProducto = String(p.codigo || '').trim().toUpperCase();
+        return codigoProducto === codigoBuscado;
+    });
+    
+    if (!producto) {
+        const codigosDisponibles = productos.map(p => p.codigo).join(', ');
+        console.log('📋 Códigos disponibles:', codigosDisponibles);
+        mostrarMensaje(`❌ Producto "${codigo}" no encontrado.`, 'error');
+        sistemaSonido.playNoEncontrado(); // 🔊 SONIDO DE NO ENCONTRADO
+        return;
+    }
+    
+    console.log('✅ Producto encontrado:', producto);
+    
+    // 3. Verificar stock
+    if (producto.stock <= 0) {
+        mostrarMensaje(`❌ ${producto.nombre} - SIN STOCK (Stock: ${producto.stock})`, 'error');
+        sistemaSonido.playError(); // 🔊 SONIDO DE ERROR
+        
+        // Registrar intento de venta sin stock
+        const intentosVenta = JSON.parse(localStorage.getItem('pos_intentos_venta_sin_stock') || '[]');
+        intentosVenta.push({
+            fecha: new Date().toISOString(),
+            producto: producto.nombre,
+            codigo: producto.codigo,
+            stock: producto.stock,
+            usuario: localStorage.getItem('pos_apertura_actual_id') || 'Desconocido'
+        });
+        localStorage.setItem('pos_intentos_venta_sin_stock', JSON.stringify(intentosVenta));
+        return;
+    }
+    
+    // 4. Verificar turno activo
+    const apertura = getAperturaActual();
+    if (!apertura) {
+        mostrarMensaje('❌ No hay turno abierto. Ve a "Apertura" primero.', 'error');
+        sistemaSonido.playError(); // 🔊 SONIDO DE ERROR
+        return;
+    }
+    
+    // 5. Modo devolución
+    if (window.devolucionActiva) {
+        mostrarMensaje('📦 Modo devolución activo.', 'info');
+        const ventasBebidas = DB.get('ventas_bebidas');
+        const venta = ventasBebidas.find(v => 
+            parseInt(v.producto_id) === parseInt(producto.id) && 
+            parseInt(v.apertura_id) === parseInt(apertura.id)
+        );
+        if (venta) {
+            openDevolucionModal(venta.id, producto.id, producto.nombre, producto.precio, 1, apertura.id);
+        } else {
+            mostrarMensaje('❌ No se encontró una venta de este producto para devolver', 'error');
+            sistemaSonido.playError(); // 🔊 SONIDO DE ERROR
+        }
+        return;
+    }
+    
+    // 6. Vender con descuento de stock
+    const ventaExitosa = venderBebidaConStock(apertura.id, producto);
+    
+    if (ventaExitosa) {
+        mostrarMensaje(`✅ ${producto.nombre} vendido por $${(producto.precio || 0).toLocaleString('es-CO')}`, 'success');
+        
+        // 🔊 SONIDO DE VENTA EXITOSA
+        sistemaSonido.playExito();
+        
+        // 📢 Mostrar notificación visual flotante
+        mostrarNotificacionFlotante(producto);
+        
+        actualizarListaBebidas();
+        actualizarTotales();
+    } else {
+        sistemaSonido.playError(); // 🔊 SONIDO DE ERROR
+    }
+}
+
+// ==================== NOTIFICACIÓN FLOTANTE ====================
+function mostrarNotificacionFlotante(producto) {
+    // Crear notificación
+    const notificacion = document.createElement('div');
+    notificacion.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(46, 204, 113, 0.95);
+        color: white;
+        padding: 30px 50px;
+        border-radius: 20px;
+        font-size: 2rem;
+        font-weight: bold;
+        z-index: 10000;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        animation: popIn 0.3s ease;
+        font-family: Arial, sans-serif;
+        pointer-events: none;
+    `;
+    
+    notificacion.innerHTML = `
+        ✅ VENTA REGISTRADA<br>
+        <span style="font-size: 1.5rem;">${producto.nombre}</span><br>
+        <span style="font-size: 1.2rem; opacity: 0.9;">$${producto.precio.toLocaleString()}</span>
+    `;
+    
+    document.body.appendChild(notificacion);
+    
+    // Animación de entrada
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            80% { transform: translate(-50%, -50%) scale(1.1); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        @keyframes popOut {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Eliminar después de 1.5 segundos
+    setTimeout(() => {
+        notificacion.style.animation = 'popOut 0.3s ease';
+        setTimeout(() => {
+            notificacion.remove();
+            style.remove();
+        }, 300);
+    }, 1500);
+}
+
+// ==================== VENDER BEBIDA CON STOCK (CORREGIDO) ====================
+function venderBebidaConStock(aperturaId, producto) {
+    try {
+        // 1. Obtener productos actuales
+        const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+        const productoDB = productos.find(p => Number(p.id) === Number(producto.id));
+        
+        if (!productoDB) {
+            mostrarMensaje('❌ Producto no encontrado en inventario', 'error');
+            return null;
+        }
+        
+        if (productoDB.stock <= 0) {
+            mostrarMensaje(`❌ ${productoDB.nombre} - SIN STOCK (Stock: ${productoDB.stock})`, 'error');
+            return null;
+        }
+        
+        // 2. Crear la venta
+        const venta = {
+            id: Date.now() + Math.random() * 1000,
+            apertura_id: parseInt(aperturaId),
+            producto_id: parseInt(producto.id),
+            cantidad: 1,
+            precio: producto.precio || 0,
+            subtotal: producto.precio || 0,
+            fecha: new Date().toISOString(),
+            tipo: 'bebida'
+        };
+        
+        // 3. Descontar del stock
+        const index = productos.findIndex(p => Number(p.id) === Number(producto.id));
+        if (index === -1) {
+            mostrarMensaje('❌ Error: Producto no encontrado en stock', 'error');
+            return null;
+        }
+        
+        const stockAnterior = productos[index].stock;
+        productos[index].stock = stockAnterior - 1;
+        localStorage.setItem('pos_productos', JSON.stringify(productos));
+        
+        // 4. Registrar movimiento de stock (AUDITORÍA)
+        const movimientos = JSON.parse(localStorage.getItem('pos_movimientos_stock') || '[]');
+        movimientos.push({
+            id: Date.now(),
+            producto_id: producto.id,
+            producto_nombre: producto.nombre,
+            tipo: 'VENTA',
+            cantidad: 1,
+            stock_anterior: stockAnterior,
+            stock_nuevo: stockAnterior - 1,
+            motivo: `Venta #${venta.id}`,
+            usuario: localStorage.getItem('pos_apertura_actual_id') || 'Empleado',
+            fecha: new Date().toISOString(),
+            hora: new Date().toLocaleTimeString('es-CO')
+        });
+        localStorage.setItem('pos_movimientos_stock', JSON.stringify(movimientos));
+        
+        // 5. Guardar la venta
+        const ventasBebidas = DB.get('ventas_bebidas');
+        ventasBebidas.push(venta);
+        DB.set('ventas_bebidas', ventasBebidas);
+        
+        console.log('✅ Venta registrada. Stock:', stockAnterior, '→', stockAnterior - 1);
+        return venta;
+        
+    } catch (e) {
+        console.error('❌ Error en venderBebidaConStock:', e);
+        mostrarMensaje('❌ Error al procesar la venta: ' + e.message, 'error');
+        return null;
+    }
+}
+
+
+
+
+
+// Agrega esto en tu página de ventas
+function verificarVentasNoRegistradas() {
+    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+    const ventas = JSON.parse(localStorage.getItem('pos_ventas_turno') || '[]');
+    
+    // Mostrar resumen al cierre
+    if (ventas.length > 0) {
+        let resumen = '📊 RESUMEN DE VENTAS DEL TURNO:\n\n';
+        let totalProductos = 0;
+        
+        ventas.forEach(v => {
+            const producto = productos.find(p => p.id === v.producto_id);
+            if (producto) {
+                resumen += `✅ ${producto.nombre} - $${producto.precio.toLocaleString()}\n`;
+                totalProductos++;
+            }
+        });
+        
+        resumen += `\n📦 Total productos vendidos: ${totalProductos}`;
+        resumen += `\n💰 Total ventas: $${ventas.reduce((sum, v) => {
+            const p = productos.find(p => p.id === v.producto_id);
+            return sum + (p ? p.precio : 0);
+        }, 0).toLocaleString()}`;
+        
+        alert(resumen);
+        
+        // Preguntar si está correcto
+        const confirmar = confirm('¿Estas ventas son correctas? (¿Olvidaste alguna?)');
+        if (!confirmar) {
+            alert('⚠️ Por favor, revisa las ventas pendientes en la sección "Ventas Pendientes"');
+        }
+    }
+}
+
+// Agregar botón en la interfaz
+document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.createElement('button');
+    btn.textContent = '🔍 Verificar Ventas';
+    btn.className = 'btn';
+    btn.style.cssText = 'margin: 10px 0; background: #3498db; color: white;';
+    btn.onclick = verificarVentasNoRegistradas;
+    
+    const container = document.querySelector('.card:last-child');
+    if (container) {
+        container.appendChild(btn);
+    }
+});
+
+
+
+// ==================== CONFIGURAR ESCÁNER ====================
+function configurarScanner() {
+    const scannerInput = document.getElementById('scannerInput');
+    if (!scannerInput) return;
+    
+    // Enfocar automáticamente al cargar
+    setTimeout(() => scannerInput.focus(), 300);
+    
+    // Mantener el foco después de cada escaneo
+    scannerInput.addEventListener('blur', function() {
+        setTimeout(() => this.focus(), 100);
+    });
+    
+    // Procesar escaneo
+    scannerInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const codigo = this.value.trim();
+            if (codigo) {
+                procesarProductoEscaneado(codigo);
+                this.value = '';
+                this.focus(); // Mantener foco para próximo escaneo
+            }
+        }
+    });
+}
+
+function handleScannerKeydown(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const codigo = this.value.trim();
+        if (codigo) {
+            procesarProductoEscaneado(codigo);
+            this.value = '';
+        }
+    }
+}
+
+    // ==================== FUNCIÓN DE DEPURACIÓN ====================
+function debugDevoluciones() {
+    console.log('=== DEBUG DEVOLUCIONES ===');
+    console.log('📌 ventas_pasteles:', localStorage.getItem('pos_ventas_pasteles'));
+    console.log('📌 devoluciones:', localStorage.getItem('pos_devoluciones'));
+    console.log('📌 apertura_actual_id:', localStorage.getItem('pos_apertura_actual_id'));
+    
+    const apertura = getAperturaActual();
+    console.log('📌 Apertura activa:', apertura);
+    
+    const ventas = JSON.parse(localStorage.getItem('pos_ventas_pasteles') || '[]');
+    const devoluciones = JSON.parse(localStorage.getItem('pos_devoluciones') || '[]');
+    
+    console.log('📊 Ventas parseadas:', ventas);
+    console.log('📊 Devoluciones parseadas:', devoluciones);
+    
+    if (apertura) {
+        const ventasTurno = ventas.filter(v => parseInt(v.apertura_id) === parseInt(apertura.id));
+        console.log('📊 Ventas del turno:', ventasTurno);
+        
+        ventasTurno.forEach(v => {
+            const devuelto = devoluciones
+                .filter(d => d.ventaId === v.id && !d.anulada)
+                .reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            console.log(`  Venta ${v.id}: ${v.cantidad} unidades, devuelto: ${devuelto}, disponible: ${v.cantidad - devuelto}`);
+        });
+    }
+    console.log('=== FIN DEBUG ===');
+}
+
+// Exponer función de depuración
+window.debugDevoluciones = debugDevoluciones;
+
+    // ==================== INICIALIZAR ====================
+   document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔧 Inicializando página de ventas...');
+    actualizarFecha();
+    
+    // Forzar actualización con datos frescos
+    setTimeout(function() {
+        actualizarListaPasteles(true);
+        actualizarListaBebidas(true);
+        actualizarListaNequi(true);
+        actualizarTotales();
+    }, 100);
+    
+    configurarScanner();
+    
+    const apertura = getAperturaActual();
+    if (apertura) {
+        console.log('✅ Apertura activa:', apertura);
+    } else {
+        mostrarMensaje('⚠️ No hay un turno de apertura activo. Ve a "Apertura" para iniciar uno.', 'info');
+    }
+});
+
+
+    // Exponer funciones globales
+   // Exponer funciones globales
+window.agregarPastel = agregarPastel;
+window.agregarTransferenciaNequi = agregarTransferenciaNequi;
+window.formatearNumero = formatearNumero;
+window.formatearNumeroCompleto = formatearNumeroCompleto;
+window.formatearNumeroEntero = formatearNumeroEntero;
+window.formatearNumeroEnteroCompleto = formatearNumeroEnteroCompleto;
+window.toggleModoDevolucion = toggleModoDevolucion;
+window.openDevolucionModal = openDevolucionModal;
+window.closeDevolucionModal = closeDevolucionModal;
+window.confirmarDevolucion = confirmarDevolucion;  // <--- ESTA ES LA CLAVE
+window.eliminarVenta = eliminarVenta;
+window.eliminarNequi = eliminarNequi;
+window.actualizarListaPasteles = actualizarListaPasteles;
+window.actualizarListaBebidas = actualizarListaBebidas;
+window.actualizarListaNequi = actualizarListaNequi;
+window.actualizarTotales = actualizarTotales;
+window.mostrarMensaje = mostrarMensaje;
+window.getAperturaActual = getAperturaActual;
+window.DB = DB;
+
+console.log('✅ Ventas inicializadas correctamente');
+console.log('📌 Funciones expuestas globalmente:', {
+    confirmarDevolucion: typeof window.confirmarDevolucion,
+    openDevolucionModal: typeof window.openDevolucionModal,
+    closeDevolucionModal: typeof window.closeDevolucionModal
+});
+    
+    </script>
+</body>
+</html>

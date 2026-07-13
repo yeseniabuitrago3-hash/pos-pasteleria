@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Análisis Pastelero | POS Pastelería</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* ====== ESTILOS BÁSICOS (se mantienen igual) ====== */
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background: #f1e6e6;; font-family:'Inter',sans-serif; color:#2d1f14; padding:24px 28px; }
+        .container { max-width:1400px; margin:0 auto; }
+       
+    
+        .filtros-card { background:#FFFFFF; border-radius:32px; padding:24px 28px; margin-bottom:32px; box-shadow:0 20px 35px -12px rgba(0,0,0,0.08); border:1px solid rgba(233,124,46,0.15); }
+        .filtros-grid { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-end; }
+        .filtros-group { flex:1; min-width:180px; }
+        .filtros-group label { display:block; font-weight:700; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; color:#c0392b; margin-bottom:8px; }
+        .filtros-group select, .filtros-group input { width:100%; padding:12px 16px; background:#FEFAF6; border:1.5px solid #FFDDC4; border-radius:24px; font-size:0.9rem; font-weight:500; transition:all 0.2s; font-family:'Inter',monospace; color:#2d1f14; }
+        .filtros-group select:focus, .filtros-group input:focus { outline:none; border-color:#c0392b; box-shadow:0 0 0 3px rgba(192,57,43,0.2); background:#fff; }
+        .filtros-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+        .btn-primary { background:linear-gradient(105deg,#0d5021,#035e1e); border:none; padding:12px 28px; border-radius:40px; font-weight:700; color:#fff; font-size:0.85rem; cursor:pointer; transition:all 0.25s ease; box-shadow:0 4px 8px rgba(192,57,43,0.3); font-family:'Inter',sans-serif; }
+        .btn-primary:hover { transform:scale(1.02) translateY(-2px); box-shadow:0 12px 22px rgba(192,57,43,0.35); background:linear-gradient(105deg,#08360b,#0c5327); }
+        .btn-danger { background:linear-gradient(105deg,#c41212,#e74c3c); border:none; padding:12px 28px; border-radius:40px; font-weight:700; color:#fff; font-size:0.85rem; cursor:pointer; transition:all 0.25s ease; box-shadow:0 4px 8px rgba(192,57,43,0.3); font-family:'Inter',sans-serif; }
+        .btn-danger:hover { transform:scale(1.02) translateY(-2px); box-shadow:0 12px 22px rgba(192,57,43,0.35); background:linear-gradient(105deg,#a93226,#c0392b); }
+        .filtros-personalizados { display:none; gap:15px; flex-wrap:wrap; align-items:flex-end; margin-top:16px; padding-top:16px; border-top:2px dashed #FFDDC4; width:100%; }
+        .filtros-personalizados.visible { display:flex; }
+        .filtros-personalizados .filtros-group { flex:0 1 auto; min-width:150px; }
+        .filtros-personalizados .btn-primary { margin-bottom:0; }
+
+        /* ====== TARJETAS ESTADÍSTICAS ====== */
+        .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:25px; margin-bottom:40px; }
+        @media (max-width:1024px){ .stats-grid { grid-template-columns:repeat(2,1fr); } }
+        @media (max-width:640px){ .stats-grid { grid-template-columns:1fr; } body { padding:16px; } }
+        .stat-card { background:#FFFFFF; border-radius:36px; padding:22px 18px; text-align:center; transition:all 0.35s cubic-bezier(0.2,0.9,0.4,1.1); box-shadow:0 18px 30px -12px rgba(0,0,0,0.1); border:1px solid rgba(245,165,127,0.35); position:relative; overflow:hidden; }
+        .stat-card::after { content:''; position:absolute; top:0; left:0; width:100%; height:6px; background:linear-gradient(90deg,#2867f0,#2867f0); }
+        .stat-card:hover { transform:translateY(-8px); box-shadow:0 28px 40px -14px rgba(0,0,0,0.2); }
+        .stat-icon { font-size:2.6rem; }
+        .stat-label { font-size:0.7rem; font-weight:700; letter-spacing:1.2px; color:#B97F5E; margin-top:8px; }
+        .stat-value { font-size:2.3rem; font-weight:800; color:#3D2B1F; line-height:1.1; margin:8px 0 4px; }
+        .stat-sub { font-size:0.7rem; color:#A28C7A; font-weight:500; }
+
+        /* ====== NUEVO: UN SOLO GRÁFICO + PRODUCTOS ====== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 28px;
+            margin-bottom: 32px;
+        }
+
+        .chart-card-evolucion {
+            grid-column: 1;
+        }
+
+        .top-products-container {
+            grid-column: 1;
+            margin-top: 0;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            min-height: 400px;  /* más alto para mejor visualización */
+            flex-shrink: 0;
+        }
+        canvas {
+            max-height: 400px;
+            width: 100% !important;
+            height: 400px !important;
+        }
+
+        .chart-card, .top-products-container {
+            background: #FFFFFF;
+            border-radius: 32px;
+            padding: 20px 24px;
+            box-shadow: 0 18px 30px -12px rgba(0,0,0,0.08);
+            border: 1px solid rgba(245,169,127,0.25);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: fit-content;
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-card:hover, .top-products-container:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 22px 35px -14px rgba(0,0,0,0.12);
+        }
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #c0392b;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 3px dashed #FFD9C4;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .chart-title span { font-size:1.4rem; }
+        .top-products-list { max-height:280px; overflow-y:auto; padding-right:8px; }
+        .top-products-list::-webkit-scrollbar { width:6px; }
+        .top-products-list::-webkit-scrollbar-track { background:#FEF3E8; border-radius:10px; }
+        .top-products-list::-webkit-scrollbar-thumb { background:#c0392b; border-radius:10px; }
+        .top-item { display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:20px; margin-bottom:6px; background:#FEFAF6; transition:all 0.2s; border:1px solid transparent; }
+        .top-item:hover { background:#FFF3EA; border-color:#FFCEB0; }
+        .top-rank { width:40px; height:40px; background:#FCE5D4; border-radius:24px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#c0392b; }
+        .rank-1 { background:linear-gradient(145deg,#FFD966,#FFB347); color:#482C1A; }
+        .rank-2 { background:linear-gradient(145deg,#E0E0E0,#C0C0C0); color:#2C2C2C; }
+        .rank-3 { background:linear-gradient(145deg,#CB7E4A,#A6552A); color:#fff; }
+        .top-info h4 { font-weight:800; font-size:0.9rem; margin-bottom:2px; }
+        .top-info p { font-size:0.7rem; color:#B97F5E; }
+        .top-cantidad { font-weight:800; color:#c0392b; font-size:0.9rem; }
+        .top-total { font-size:0.75rem; font-weight:700; color:#2C7A47; }
+        .no-data { text-align:center; padding:40px 20px; color:#BB8B6B; font-weight:500; }
+        .info-badge { background:#FFF0E4; padding:8px 20px; border-radius:60px; font-size:0.7rem; font-weight:600; color:#c0392b; text-align:center; margin-bottom:28px; display:inline-block; width:auto; }
+        .badge-wrapper { text-align:right; margin-bottom:20px; }
+        .resumen-card { background:linear-gradient(125deg,#FFE3D4,#FFD3BC); border-radius:44px; padding:28px 36px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:20px; color:#482816; box-shadow:0 20px 30px -12px rgba(160,70,20,0.2); margin-top:8px; }
+        .resumen-item { text-align:center; flex:1; }
+        .resumen-label { font-size:0.7rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; opacity:0.8; }
+        .resumen-value { font-size:1.5rem; font-weight:800; margin-top:6px; }
+
+        @media (max-width:1024px){
+            .chart-container { min-height:320px; }
+            canvas { height:320px !important; }
+            .top-products-list { max-height:260px; }
+        }
+        @media (max-width:768px){
+            .main-nav { border-radius:32px; justify-content:center; }
+            .chart-card, .top-products-container { padding:16px 20px; }
+            .resumen-value { font-size:1.2rem; }
+            .chart-title { font-size:1rem; }
+            canvas { height:260px !important; }
+            .chart-container { min-height:260px; }
+            .filtros-actions { flex-direction:column; width:100%; }
+            .filtros-actions .btn-primary, .filtros-actions .btn-danger { width:100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo">
+            <h1> Pastelería donde Fer - Análisis</h1>
+            <span class="fecha" id="fechaActual"></span>
+        </div>
+        <div class="turno-info">
+            <span id="estadoTurno" class="estado-cerrado">🔴 Turno cerrado</span>
+            <span id="baseInfo" class="base-info"></span>
+        </div>
+    </header>
+
+    <!-- MENÚ PRINCIPAL -->
+    <nav class="main-nav">
+        <button onclick="window.location.href='../index.html'" class="nav-btn">🏠 Inicio</button>
+        <button onclick="window.location.href='apertura.html'" class="nav-btn">🚀 Apertura</button>
+        <button onclick="window.location.href='ventas.html'" class="nav-btn">💰 Ventas</button>
+        <button onclick="window.location.href='cierre.html'" class="nav-btn">📊 Cierre</button>
+        <button onclick="window.location.href='historial.html'" class="nav-btn">📜 Historial</button>
+        <button onclick="window.location.href='inventario.html'" class="nav-btn">📦 Inventario</button>
+        <button onclick="window.location.href='recibir_pedido.html'" class="nav-btn">📥 Recibir Pedido</button>
+        <button onclick="window.location.href='dashboard_analisis.html'" class="nav-btn nav-btn-active">📈 Análisis</button>
+    </nav>
+
+    <!-- FILTROS -->
+    <div class="filtros-card">
+        <div class="filtros-grid">
+            <div class="filtros-group" style="flex:2;min-width:200px;">
+                <label>📅 Período de análisis</label>
+                <select id="periodoSelect">
+                    <option value="diario">📆 Diario (Hoy)</option>
+                    <option value="semanal" selected>📅 Semanal</option>
+                    <option value="mensual">📊 Mensual</option>
+                    <option value="anual">📈 Anual</option>
+                    <option value="personalizado">🎯 Personalizado</option>
+                </select>
+            </div>
+            <div class="filtros-actions">
+                <button onclick="actualizarDashboard()" class="btn-primary">🔄 ACTUALIZAR</button>
+                <button onclick="eliminarTodosLosCierres()" class="btn-danger">🗑️ Eliminar Todos</button>
+            </div>
+        </div>
+        <div class="filtros-personalizados" id="fechasPersonalizadas">
+            <div class="filtros-group">
+                <label>📅 Desde</label>
+                <input type="date" id="fechaDesdePersonal">
+            </div>
+            <div class="filtros-group">
+                <label>📅 Hasta</label>
+                <input type="date" id="fechaHastaPersonal">
+            </div>
+            <button onclick="aplicarFiltroPersonalizado()" class="btn-primary">🎯 Aplicar</button>
+        </div>
+    </div>
+
+    <!-- TARJETAS ESTADÍSTICAS -->
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon">💵</div><div class="stat-label">TOTAL VENTAS</div><div class="stat-value" id="totalVentasStats">$0</div><div class="stat-sub">período actual</div></div>
+        <div class="stat-card"><div class="stat-icon">📲</div><div class="stat-label">TOTAL NEQUI</div><div class="stat-value" id="totalNequiStats">$0</div><div class="stat-sub">transferencias</div></div>
+        <div class="stat-card"><div class="stat-icon">🥧</div><div class="stat-label">PASTELES VENDIDOS</div><div class="stat-value" id="totalPastelesStats">0</div><div class="stat-sub">unidades</div></div>
+        <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">CIERRES REALIZADOS</div><div class="stat-value" id="totalCierresStats">0</div><div class="stat-sub">turnos finalizados</div></div>
+    </div>
+
+    <!-- BADGE DE INFORMACIÓN -->
+    <div class="badge-wrapper">
+        <div class="info-badge" id="infoBadge">✨ Datos en tendencia pastelera</div>
+    </div>
+
+    <!-- GRID DE GRÁFICOS: SOLO EVOLUCIÓN + PRODUCTOS -->
+    <div class="charts-grid">
+        <!-- Tarjeta 1: Evolución de ventas (único gráfico) -->
+        <div class="chart-card chart-card-evolucion">
+            <div class="chart-title" id="tituloEvolucion"><span>📊</span> Evolución de ventas en el período</div>
+            <div class="chart-container">
+                <canvas id="chartVentas"></canvas>
+            </div>
+            <div id="sinDatosVentas" class="no-data" style="display:none;">📭 No hay datos de ventas en este rango</div>
+        </div>
+
+        <!-- Tarjeta 2: Productos estrella -->
+        <div class="top-products-container">
+            <div class="chart-title"><span>🏆</span> Productos estrella</div>
+            <div class="top-products-list" id="topProductosLista">
+                <div class="no-data">🍰 Cargando productos...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESUMEN ADICIONAL -->
+    <div class="resumen-card">
+        <div class="resumen-item"><div class="resumen-label">📊 Promedio por día</div><div class="resumen-value" id="promedioDiario">$0</div></div>
+        <div class="resumen-item"><div class="resumen-label">🏆 Mejor día (ventas)</div><div class="resumen-value" id="mejorDia">-</div></div>
+        <div class="resumen-item"><div class="resumen-label">🔄 Transacciones</div><div class="resumen-value" id="totalTransacciones">0</div></div>
+    </div>
+</div>
+
+<script src="../js/database.js"></script>
+<script>
+    // ==================== VARIABLES GLOBALES ====================
+    let chartVentas;
+
+    // ==================== ACTUALIZAR FECHA ====================
+    function actualizarFecha() {
+        const hoy = new Date();
+        const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const fechaSpan = document.getElementById('fechaActual');
+        if (fechaSpan) fechaSpan.textContent = hoy.toLocaleDateString('es-ES', opciones);
+    }
+
+    // ==================== ELIMINAR TODOS LOS CIERRES ====================
+    function eliminarTodosLosCierres() {
+        const cierresData = localStorage.getItem('pos_cierres_caja');
+        const cierres = cierresData ? JSON.parse(cierresData) : [];
+        if (cierres.length === 0) {
+            alert('📭 No hay registros de cierres para eliminar.');
+            return;
+        }
+        const confirmar = confirm(`⚠️ ¿ESTÁS SEGURO?\n\nEsta acción eliminará TODOS los ${cierres.length} registros de cierres.\n\n💰 Ventas totales: $${cierres.reduce((sum, c) => sum + (c.total_ventas_pasteles || 0) + (c.total_ventas_bebidas || 0), 0).toLocaleString('es-ES')}\n\n⚠️ Esta acción es IRREVERSIBLE.`);
+        if (!confirmar) return;
+        const confirmar2 = confirm(`🔴 CONFIRMACIÓN FINAL\n\n¿Estás 100% seguro de que deseas eliminar TODOS los registros?\n\nEsta acción no se puede deshacer.`);
+        if (!confirmar2) return;
+        try {
+            localStorage.setItem('pos_cierres_caja', JSON.stringify([]));
+            actualizarDashboard();
+            alert('✅ Todos los registros de cierres han sido eliminados correctamente.');
+        } catch (error) {
+            console.error('❌ Error al eliminar cierres:', error);
+            alert('❌ Error al eliminar los registros: ' + error.message);
+        }
+    }
+    window.eliminarTodosLosCierres = eliminarTodosLosCierres;
+
+    // ==================== ACTUALIZAR ESTADO DE TURNO ====================
+    function actualizarEstadoTurno() {
+        try {
+            const aperturaId = localStorage.getItem('pos_apertura_actual_id');
+            let apertura = null;
+            if (aperturaId) {
+                const aperturasData = localStorage.getItem('pos_aperturas_caja');
+                const aperturas = aperturasData ? JSON.parse(aperturasData) : [];
+                apertura = aperturas.find(a => String(a.id) === String(aperturaId) && a.estado === 'abierta');
+            }
+            const estadoSpan = document.getElementById('estadoTurno');
+            const baseSpan = document.getElementById('baseInfo');
+            if (apertura) {
+                estadoSpan.className = 'estado-abierto';
+                estadoSpan.innerHTML = '🟢 Turno abierto';
+                if(baseSpan) baseSpan.innerHTML = `Base: $${(apertura.base_total || 0).toLocaleString('es-ES')}`;
+            } else {
+                estadoSpan.className = 'estado-cerrado';
+                estadoSpan.innerHTML = '🔴 Turno cerrado';
+                if(baseSpan) baseSpan.innerHTML = '';
+            }
+        } catch (e) {
+            console.error('Error al actualizar estado del turno:', e);
+        }
+    }
+
+    // ==================== FORMATEAR FECHA ====================
+    function formatearFechaEnEspanol(fechaString) {
+        if (!fechaString) return '-';
+        try {
+            const fecha = new Date(fechaString);
+            return fecha.toLocaleDateString('es-ES', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+        } catch (error) {
+            return fechaString;
+        }
+    }
+
+    // ==================== OBTENER FECHAS SEGÚN PERÍODO ====================
+    function obtenerFechasPeriodo() {
+        const hoy = new Date();
+        let fechaInicio, fechaFin;
+        const periodo = document.getElementById('periodoSelect').value;
+        const ahora = new Date(hoy);
+        
+        switch(periodo) {
+            case 'diario':
+                fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
+                fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
+                break;
+            case 'semanal':
+                fechaInicio = new Date(ahora);
+                fechaInicio.setDate(ahora.getDate() - 6);
+                fechaInicio.setHours(0, 0, 0, 0);
+                fechaFin = new Date(ahora);
+                fechaFin.setHours(23, 59, 59, 999);
+                break;
+            case 'mensual':
+                fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1, 0, 0, 0, 0);
+                fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59, 999);
+                break;
+            case 'anual':
+                fechaInicio = new Date(ahora.getFullYear(), 0, 1, 0, 0, 0, 0);
+                fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59, 999);
+                break;
+            case 'personalizado':
+                const desde = document.getElementById('fechaDesdePersonal').value;
+                const hasta = document.getElementById('fechaHastaPersonal').value;
+                if(desde && hasta) {
+                    const d = new Date(desde);
+                    const h = new Date(hasta);
+                    fechaInicio = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+                    fechaFin = new Date(h.getFullYear(), h.getMonth(), h.getDate(), 23, 59, 59, 999);
+                } else {
+                    fechaInicio = new Date(ahora);
+                    fechaInicio.setDate(ahora.getDate() - 7);
+                    fechaInicio.setHours(0, 0, 0, 0);
+                    fechaFin = new Date(ahora);
+                    fechaFin.setHours(23, 59, 59, 999);
+                }
+                break;
+            default:
+                fechaInicio = new Date(ahora);
+                fechaInicio.setDate(ahora.getDate() - 7);
+                fechaInicio.setHours(0, 0, 0, 0);
+                fechaFin = new Date(ahora);
+                fechaFin.setHours(23, 59, 59, 999);
+        }
+        return { fechaInicio, fechaFin };
+    }
+
+    // ==================== OBTENER DATOS DE LOCALSTORAGE ====================
+    function obtenerDatosLocalStorage() {
+        try {
+            const cierres = JSON.parse(localStorage.getItem('pos_cierres_caja') || '[]');
+            const ventasPasteles = JSON.parse(localStorage.getItem('pos_ventas_pasteles') || '[]');
+            const ventasBebidas = JSON.parse(localStorage.getItem('pos_ventas_bebidas') || '[]');
+            const transferencias = JSON.parse(localStorage.getItem('pos_transferencias_nequi') || '[]');
+            const devoluciones = JSON.parse(localStorage.getItem('pos_devoluciones') || '[]');
+            const aperturas = JSON.parse(localStorage.getItem('pos_aperturas_caja') || '[]');
+            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
+            return { cierres, ventasPasteles, ventasBebidas, transferencias, devoluciones, aperturas, productos };
+        } catch (e) {
+            console.error('Error al obtener datos de localStorage:', e);
+            return { cierres: [], ventasPasteles: [], ventasBebidas: [], transferencias: [], devoluciones: [], aperturas: [], productos: [] };
+        }
+    }
+
+    // ==================== OBTENER VENTAS POR APERTURA ====================
+    function obtenerVentasPorApertura(aperturaId, datos) {
+        const { ventasPasteles, ventasBebidas, transferencias, devoluciones } = datos;
+        const aperturaIdStr = String(aperturaId);
+        const ventasPastelesFiltradas = ventasPasteles.filter(v => String(v.apertura_id) === aperturaIdStr);
+        const ventasBebidasFiltradas = ventasBebidas.filter(v => String(v.apertura_id) === aperturaIdStr);
+        const transferenciasFiltradas = transferencias.filter(t => String(t.apertura_id) === aperturaIdStr);
+        const devolucionesFiltradas = devoluciones.filter(d => String(d.aperturaId) === aperturaIdStr || String(d.apertura_id) === aperturaIdStr);
+        
+        let totalPasteles = 0;
+        let cantidadPasteles = 0;
+        ventasPastelesFiltradas.forEach(v => {
+            const devuelto = devolucionesFiltradas.filter(d => String(d.ventaId) === String(v.id) && !d.anulada).reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            const cantidadVendida = (v.cantidad || 0) - devuelto;
+            cantidadPasteles += cantidadVendida;
+            totalPasteles += cantidadVendida * (v.precio_unitario || 2000);
+        });
+        let totalBebidas = 0;
+        let cantidadBebidas = 0;
+        ventasBebidasFiltradas.forEach(v => {
+            const devuelto = devolucionesFiltradas.filter(d => String(d.ventaId) === String(v.id) && !d.anulada).reduce((sum, d) => sum + (d.cantidad || 0), 0);
+            const cantidadVendida = (v.cantidad || 1) - devuelto;
+            cantidadBebidas += cantidadVendida;
+            totalBebidas += cantidadVendida * (v.precio || 0);
+        });
+        const totalNequi = transferenciasFiltradas.reduce((sum, t) => sum + (t.monto || 0), 0);
+        const totalEfectivo = totalPasteles + totalBebidas;
+        return {
+            totalPasteles, totalBebidas, totalEfectivo, totalNequi,
+            cantidadPasteles, cantidadBebidas,
+            ventasPastelesFiltradas, ventasBebidasFiltradas, transferenciasFiltradas
+        };
+    }
+
+    // ==================== ESTADÍSTICAS DEL PERÍODO ====================
+    function getEstadisticasPeriodo(fechaInicio, fechaFin) {
+        const datos = obtenerDatosLocalStorage();
+        const { cierres } = datos;
+        const cierresFiltrados = cierres.filter(c => {
+            try {
+                const fechaCierre = new Date(c.fecha_cierre);
+                return fechaCierre >= fechaInicio && fechaCierre <= fechaFin;
+            } catch (e) { return false; }
+        });
+        let totalVentas = 0, totalNequi = 0, totalPasteles = 0, totalCierres = cierresFiltrados.length;
+        let mejorDia = { fecha: null, total: 0 };
+        let ventasPorDia = new Map();
+        cierresFiltrados.forEach(c => {
+            const ventas = obtenerVentasPorApertura(c.apertura_id, datos);
+            totalVentas += ventas.totalEfectivo || 0;
+            totalNequi += ventas.totalNequi || 0;
+            totalPasteles += ventas.cantidadPasteles || 0;
+            try {
+                const fechaKey = new Date(c.fecha_cierre).toISOString().split('T')[0];
+                const totalDia = (ventas.totalEfectivo || 0) + (ventas.totalNequi || 0);
+                ventasPorDia.set(fechaKey, (ventasPorDia.get(fechaKey) || 0) + totalDia);
+            } catch (e) {}
+        });
+        for (const [fecha, total] of ventasPorDia) {
+            if (total > mejorDia.total) { mejorDia = { fecha, total }; }
+        }
+        const dias = Math.max(1, Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24)));
+        const promedioDiario = totalVentas / dias;
+        return { totalVentas, totalNequi, totalPasteles, totalCierres, promedioDiario, mejorDia, ventasPorDia };
+    }
+
+    // ==================== TOP PRODUCTOS ====================
+    function getTopProductos(fechaInicio, fechaFin) {
+        const datos = obtenerDatosLocalStorage();
+        const { cierres, productos } = datos;
+        const productosMap = {};
+        const cierresFiltrados = cierres.filter(c => {
+            try {
+                const fechaCierre = new Date(c.fecha_cierre);
+                return fechaCierre >= fechaInicio && fechaCierre <= fechaFin;
+            } catch (e) { return false; }
+        });
+        cierresFiltrados.forEach(c => {
+            const ventas = obtenerVentasPorApertura(c.apertura_id, datos);
+            ventas.ventasPastelesFiltradas?.forEach(v => {
+                const nombre = 'Pastel Tradicional';
+                const cantidad = v.cantidad || 0;
+                const total = cantidad * (v.precio_unitario || 2000);
+                if (!productosMap[nombre]) {
+                    productosMap[nombre] = { nombre, cantidad: 0, total: 0, categoria: 'Pasteles' };
+                }
+                productosMap[nombre].cantidad += cantidad;
+                productosMap[nombre].total += total;
+            });
+            ventas.ventasBebidasFiltradas?.forEach(v => {
+                const producto = productos.find(p => String(p.id) === String(v.producto_id));
+                const nombre = producto?.nombre || 'Bebida Desconocida';
+                const categoria = producto?.categoria || 'Bebidas';
+                const cantidad = v.cantidad || 1;
+                const total = v.subtotal || 0;
+                if (!productosMap[nombre]) {
+                    productosMap[nombre] = { nombre, cantidad: 0, total: 0, categoria };
+                }
+                productosMap[nombre].cantidad += cantidad;
+                productosMap[nombre].total += total;
+            });
+        });
+        return Object.values(productosMap).sort((a, b) => b.total - a.total);
+    }
+
+    // ==================== OBTENER DATOS PARA EVOLUCIÓN SEGÚN PERÍODO ====================
+    function getDatosEvolucion(periodo, fechaInicio, fechaFin) {
+        const stats = getEstadisticasPeriodo(fechaInicio, fechaFin);
+        const ventasPorDia = stats.ventasPorDia || new Map();
+        let labels = [];
+        let data = [];
+
+        if (periodo === 'diario') {
+            // Un solo día: hoy
+            const hoyStr = new Date().toISOString().split('T')[0];
+            const total = ventasPorDia.get(hoyStr) || 0;
+            labels = ['Hoy'];
+            data = [total];
+        } 
+        else if (periodo === 'semanal') {
+            // Últimos 7 días (incluyendo hoy)
+            const hoy = new Date();
+            for (let i = 6; i >= 0; i--) {
+                const fecha = new Date(hoy);
+                fecha.setDate(hoy.getDate() - i);
+                const key = fecha.toISOString().split('T')[0];
+                const total = ventasPorDia.get(key) || 0;
+                labels.push(fecha.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit' }));
+                data.push(total);
+            }
+        }
+        else if (periodo === 'mensual') {
+            // Un solo mes: total del mes actual
+            const totalMes = Array.from(ventasPorDia.values()).reduce((a, b) => a + b, 0);
+            const mesNombre = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+            labels = [mesNombre];
+            data = [totalMes];
+        }
+        else if (periodo === 'anual') {
+            // 12 meses
+            const hoy = new Date();
+            const año = hoy.getFullYear();
+            const mesesMap = new Map();
+            for (let mes = 0; mes < 12; mes++) {
+                const key = `${año}-${(mes+1).toString().padStart(2,'0')}`;
+                mesesMap.set(key, 0);
+            }
+            for (const [fecha, total] of ventasPorDia) {
+                const d = new Date(fecha);
+                if (d.getFullYear() === año) {
+                    const mesKey = `${año}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+                    mesesMap.set(mesKey, (mesesMap.get(mesKey) || 0) + total);
+                }
+            }
+            const mesesOrdenados = Array.from(mesesMap.keys()).sort();
+            labels = mesesOrdenados.map(m => {
+                const [year, month] = m.split('-');
+                const fecha = new Date(parseInt(year), parseInt(month)-1, 1);
+                return fecha.toLocaleDateString('es-ES', { month: 'short' });
+            });
+            data = mesesOrdenados.map(m => mesesMap.get(m) || 0);
+        }
+        else if (periodo === 'personalizado') {
+            // Rango personalizado: mostrar por día (si son muchos, se puede agrupar, pero dejamos días)
+            const keys = Array.from(ventasPorDia.keys()).sort();
+            labels = keys.map(k => {
+                const d = new Date(k);
+                return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+            });
+            data = keys.map(k => ventasPorDia.get(k) || 0);
+        }
+
+        // Si no hay datos, mostrar un placeholder
+        if (labels.length === 0) {
+            labels = ['Sin datos'];
+            data = [0];
+        }
+
+        return { labels, data };
+    }
+
+    // ==================== ACTUALIZAR DASHBOARD ====================
+    function actualizarDashboard() {
+        console.log('🔄 Actualizando dashboard...');
+        try {
+            const { fechaInicio, fechaFin } = obtenerFechasPeriodo();
+            const periodo = document.getElementById('periodoSelect').value;
+            const stats = getEstadisticasPeriodo(fechaInicio, fechaFin);
+
+            // Actualizar tarjetas
+            document.getElementById('totalVentasStats').textContent = `$${stats.totalVentas.toLocaleString('es-ES')}`;
+            document.getElementById('totalNequiStats').textContent = `$${stats.totalNequi.toLocaleString('es-ES')}`;
+            document.getElementById('totalPastelesStats').textContent = stats.totalPasteles || 0;
+            document.getElementById('totalCierresStats').textContent = stats.totalCierres || 0;
+            document.getElementById('promedioDiario').textContent = `$${Math.round(stats.promedioDiario || 0).toLocaleString('es-ES')}`;
+            const mejorDiaFormateado = stats.mejorDia?.fecha ? 
+                `${formatearFechaEnEspanol(stats.mejorDia.fecha)} ($${(stats.mejorDia.total || 0).toLocaleString('es-ES')})` : '-';
+            document.getElementById('mejorDia').textContent = mejorDiaFormateado;
+            document.getElementById('totalTransacciones').textContent = stats.totalCierres || 0;
+
+            // Top productos
+            const topProductos = getTopProductos(fechaInicio, fechaFin);
+            const containerTop = document.getElementById('topProductosLista');
+            if (topProductos.length === 0) {
+                containerTop.innerHTML = '<div class="no-data">🍰 No hay productos vendidos en este período</div>';
+            } else {
+                let html = '';
+                topProductos.slice(0, 10).forEach((item, idx) => {
+                    const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
+                    html += `
+                        <div class="top-item">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <div class="top-rank ${rankClass}">${idx + 1}</div>
+                                <div class="top-info">
+                                    <h4>${item.nombre}</h4>
+                                    <p>${item.categoria || 'Producto'}</p>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div class="top-cantidad">${item.cantidad} ud</div>
+                                <div class="top-total">$${item.total.toLocaleString('es-ES')}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                containerTop.innerHTML = html;
+            }
+
+            // ===== GRÁFICO ÚNICO: Evolución de ventas =====
+            const datosEvolucion = getDatosEvolucion(periodo, fechaInicio, fechaFin);
+            const ctxVentas = document.getElementById('chartVentas');
+            if (ctxVentas) {
+                if (chartVentas) chartVentas.destroy();
+                chartVentas = new Chart(ctxVentas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: datosEvolucion.labels,
+                        datasets: [{
+                            label: 'Ventas',
+                            data: datosEvolucion.data,
+                            backgroundColor: '#c0392b',
+                            borderRadius: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        barPercentage: 0.6,          // Reduce el ancho de cada barra (0.5-0.8 es típico)
+                        categoryPercentage: 0.8,
+                        plugins: {
+                            tooltip: { callbacks: { label: (ctx) => `$${ctx.raw.toLocaleString('es-ES')}` } },
+                            legend: { position: 'top', labels: { font: { size: 11 } } }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { callback: (value) => '$' + value.toLocaleString('es-ES') }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Actualizar título del gráfico según período
+            const tituloMap = {
+                'diario': 'Ventas del día (Hoy)',
+                'semanal': 'Ventas de los últimos 7 días',
+                'mensual': 'Total de ventas del mes',
+                'anual': 'Ventas mensuales del año',
+                'personalizado': 'Ventas en el rango seleccionado'
+            };
+            document.getElementById('tituloEvolucion').innerHTML = `<span>📊</span> ${tituloMap[periodo] || 'Evolución de ventas'}`;
+
+            // Badge de información
+            const ahora = new Date();
+            const periodoText = `${formatearFechaEnEspanol(fechaInicio.toISOString())} — ${formatearFechaEnEspanol(fechaFin.toISOString())}`;
+            document.getElementById('infoBadge').innerHTML = `📅 Período: ${periodoText} • 🍰 Actualizado ${ahora.toLocaleTimeString('es-ES')}`;
+
+            console.log('✅ Dashboard actualizado correctamente');
+        } catch (error) {
+            console.error('❌ Error al actualizar dashboard:', error);
+        }
+    }
+
+    // ==================== CAMBIAR PERÍODO ====================
+    function cambiarPeriodo() {
+        const val = document.getElementById('periodoSelect').value;
+        const divFechas = document.getElementById('fechasPersonalizadas');
+        if (divFechas) {
+            if (val === 'personalizado') {
+                divFechas.classList.add('visible');
+                const hoy = new Date();
+                const hace7Dias = new Date(hoy);
+                hace7Dias.setDate(hoy.getDate() - 7);
+                const desdeInput = document.getElementById('fechaDesdePersonal');
+                const hastaInput = document.getElementById('fechaHastaPersonal');
+                if (desdeInput && !desdeInput.value) desdeInput.value = hace7Dias.toISOString().split('T')[0];
+                if (hastaInput && !hastaInput.value) hastaInput.value = hoy.toISOString().split('T')[0];
+            } else {
+                divFechas.classList.remove('visible');
+            }
+        }
+        actualizarDashboard();
+    }
+
+    // ==================== APLICAR FILTRO PERSONALIZADO ====================
+    function aplicarFiltroPersonalizado() {
+        const desde = document.getElementById('fechaDesdePersonal').value;
+        const hasta = document.getElementById('fechaHastaPersonal').value;
+        if (!desde || !hasta) {
+            alert('⚠️ Por favor selecciona ambas fechas (Desde y Hasta)');
+            return;
+        }
+        if (new Date(desde) > new Date(hasta)) {
+            alert('⚠️ La fecha "Desde" no puede ser mayor que la fecha "Hasta"');
+            return;
+        }
+        actualizarDashboard();
+    }
+
+    // ==================== CREAR CIERRES DE PRUEBA (SOLO UNA VEZ) ====================
+function crearCierresConFechasReales() {
+    // Verificar si ya se crearon los datos de prueba (flag)
+    const yaInicializado = localStorage.getItem('pos_cierres_inicializados');
+    
+    if (yaInicializado === 'true') {
+        console.log('📊 Los datos de prueba ya fueron creados anteriormente.');
+        return;
+    }
+    
+    // Verificar si ya existen cierres reales
+   // En lugar de llamar a crearCierresConFechasReales() siempre,
+// solo si no hay datos y es necesario
+const cierresExistentes = JSON.parse(localStorage.getItem('pos_cierres_caja') || '[]');
+if (cierresExistentes.length === 0) {
+    crearCierresConFechasReales();
+} else {
+    console.log(`📊 Ya existen ${cierresExistentes.length} cierres. No se crearán datos de prueba.`);
+}
+    
+    // Solo crear datos de prueba si NO hay ningún cierre
+    if (cierresExistentes.length === 0) {
+        console.log('📊 No hay cierres existentes. Creando datos de prueba...');
+        // ... aquí va TODO el código que crea los cierres de prueba
+        // (el mismo código que ya tenías)
+        const nuevosCierres = [];
+        const hoy = new Date();
+        const añoActual = hoy.getFullYear();
+        // ... resto del código de creación ...
+        
+        // Guardar los cierres
+        localStorage.setItem('pos_cierres_caja', JSON.stringify(nuevosCierres));
+        // Marcar como inicializado para que no se vuelva a ejecutar
+        localStorage.setItem('pos_cierres_inicializados', 'true');
+        console.log('✅ Datos de prueba creados exitosamente.');
+    } else {
+        localStorage.setItem('pos_cierres_inicializados', 'true');
+    }
+}
+
+
+    // ==================== INICIALIZACIÓN ====================
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 Inicializando dashboard de análisis...');
+        crearCierresConFechasReales();
+        actualizarFecha();
+        actualizarEstadoTurno();
+        const periodoSelect = document.getElementById('periodoSelect');
+        if (periodoSelect) periodoSelect.addEventListener('change', cambiarPeriodo);
+        const fechaDesde = document.getElementById('fechaDesdePersonal');
+        const fechaHasta = document.getElementById('fechaHastaPersonal');
+        if (fechaDesde) fechaDesde.addEventListener('change', actualizarDashboard);
+        if (fechaHasta) fechaHasta.addEventListener('change', actualizarDashboard);
+        const hoy = new Date();
+        const hace7Dias = new Date(hoy);
+        hace7Dias.setDate(hoy.getDate() - 7);
+        if (fechaDesde && !fechaDesde.value) fechaDesde.value = hace7Dias.toISOString().split('T')[0];
+        if (fechaHasta && !fechaHasta.value) fechaHasta.value = hoy.toISOString().split('T')[0];
+        setTimeout(() => {
+            actualizarDashboard();
+            console.log('✅ Dashboard inicial cargado');
+        }, 500);
+        setInterval(() => { actualizarEstadoTurno(); actualizarDashboard(); }, 30000);
+    });
+
+    // ==================== EXPONER FUNCIONES ====================
+    window.actualizarDashboard = actualizarDashboard;
+    window.cambiarPeriodo = cambiarPeriodo;
+    window.aplicarFiltroPersonalizado = aplicarFiltroPersonalizado;
+    window.actualizarEstadoTurno = actualizarEstadoTurno;
+    window.eliminarTodosLosCierres = eliminarTodosLosCierres;
+</script>
+</body>
+</html>
