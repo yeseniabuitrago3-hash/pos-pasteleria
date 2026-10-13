@@ -206,43 +206,27 @@
   <script src="../js/database.js"></script>
 <script src="../js/scanner.js"></script>
 <script>
-    // ==================== FUNCIÓN PARA OBTENER APERTURA ACTUAL ====================
-   // ==================== FUNCIÓN PARA OBTENER APERTURA ACTUAL (CORREGIDA) ====================
-function getAperturaActual() {
-    try {
-        const aperturaId = localStorage.getItem('pos_apertura_actual_id');
-        if (aperturaId) {
-            const aperturasData = localStorage.getItem('pos_aperturas_caja');
-            const aperturas = aperturasData ? JSON.parse(aperturasData) : [];
-            const apertura = aperturas.find(a => String(a.id) === String(aperturaId) && a.estado === 'abierta');
-            if (apertura) return apertura;
-        }
-        
-        const aperturasData = localStorage.getItem('pos_aperturas_caja');
-        const aperturas = aperturasData ? JSON.parse(aperturasData) : [];
-        const aperturaAbierta = aperturas.find(a => a.estado === 'abierta');
-        if (aperturaAbierta) {
-            localStorage.setItem('pos_apertura_actual_id', String(aperturaAbierta.id));
-            return aperturaAbierta;
-        }
-        
-        return null;
-    } catch (e) {
-        console.error('Error al obtener apertura:', e);
-        return null;
-    }
-}
+    // ============================================================
+    // API DE PRODUCTOS (conexión con Supabase)
+    // ============================================================
+    const API_URL = '../../php/api/productos.php';
+
+    // ==================== VARIABLES GLOBALES ====================
+    let facturaActual = { numero: null, proveedor: null, productos: [] };
+    let productoEscaneadoTemporal = null;
+    let productosCache = [];
+
     // ==================== FUNCIONES DE FORMATEO ====================
     function formatearNumero(input) {
         let valor = input.value.replace(/[^0-9]/g, '');
         if (valor === '') { input.value = ''; return; }
-        input.value = parseInt(valor, 10).toLocaleString('es-ES');
+        input.value = parseInt(valor, 10).toLocaleString('es-CO');
     }
     
     function formatearNumeroCompleto(input) {
         let valor = input.value.replace(/[^0-9]/g, '');
         if (valor === '') { input.value = ''; return; }
-        input.value = parseInt(valor, 10).toLocaleString('es-ES');
+        input.value = parseInt(valor, 10).toLocaleString('es-CO');
     }
     
     function obtenerValorNumerico(inputId) {
@@ -259,41 +243,34 @@ function getAperturaActual() {
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
     }
-    
-    // ==================== FUNCIÓN ACTUALIZAR ESTADO TURNO (CORREGIDA) ====================
-    function actualizarEstadoTurno() {
-        const apertura = getAperturaActual();
+
+    // ==================== ACTUALIZAR ESTADO DEL TURNO ====================
+    async function actualizarEstadoTurno() {
+        // Como el turno ya no se maneja en localStorage, lo mostramos como cerrado
         const estadoSpan = document.getElementById('estadoTurno');
         const baseSpan = document.getElementById('baseInfo');
         
-        console.log('🔍 Verificando turno en Recibir Pedido:', apertura ? 'Activo' : 'Cerrado');
-        
-        if (apertura) {
-            estadoSpan.className = 'estado-abierto';
-            estadoSpan.innerHTML = '🟢 Turno abierto';
-            if (baseSpan) {
-                baseSpan.innerHTML = `👤 ${apertura.responsable || 'No especificado'}`;
-            }
-        } else {
+        if (estadoSpan) {
             estadoSpan.className = 'estado-cerrado';
             estadoSpan.innerHTML = '🔴 Turno cerrado';
-            if (baseSpan) {
-                baseSpan.innerHTML = '';
-            }
+        }
+        if (baseSpan) {
+            baseSpan.innerHTML = '';
         }
     }
 
-    // ==================== VARIABLES GLOBALES ====================
-    let facturaActual = { numero: null, proveedor: null, productos: [] };
-    let productoEscaneadoTemporal = null;
-    
+    // ==================== ACTUALIZAR FECHA ====================
     function actualizarFecha() {
         const hoy = new Date();
-        document.getElementById('fechaActual').textContent = hoy.toLocaleDateString('es-ES', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-        });
+        const fechaEl = document.getElementById('fechaActual');
+        if (fechaEl) {
+            fechaEl.textContent = hoy.toLocaleDateString('es-CO', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
     }
-    
+
+    // ==================== INICIAR NUEVA FACTURA ====================
     function iniciarNuevaFactura() {
         document.getElementById('modalNuevaFactura').style.display = 'flex';
         document.getElementById('facturaNumeroInput').value = `FAC-${new Date().toISOString().slice(0,10)}-001`;
@@ -320,109 +297,123 @@ function getAperturaActual() {
         actualizarContadorProductos();
         cerrarModalNuevaFactura();
         mostrarToast(`✅ Factura ${numero} iniciada`, 'success');
+        
+        // Cargar el resumen de stock desde Supabase
+        actualizarResumenStock();
     }
-   function procesarProductoEscaneado(codigo) {
-    if (!facturaActual.numero) {
-        mostrarToast('❌ Primero inicia una factura', 'warning');
-        return;
-    }
-    
-    console.log('📡 Escaneado código:', codigo);
-    
-    // Buscar en localStorage
-    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-    console.log('📦 Productos en DB:', productos);
-    
-    // Buscar por código (comparación exacta)
-    const producto = productos.find(p => {
-        const codigoProducto = String(p.codigo || '').trim().toUpperCase();
-        const codigoBuscado = String(codigo || '').trim().toUpperCase();
-        return codigoProducto === codigoBuscado;
-    });
-    
-    if (!producto) {
-        mostrarToast(`❌ Producto "${codigo}" no encontrado`, 'error');
-        return;
-    }
-    
-    console.log('✅ Producto encontrado:', producto);
-    
-    productoEscaneadoTemporal = producto;
-    document.getElementById('infoProductoModal').innerHTML = `
-        <p><strong>📦 Producto:</strong> ${producto.nombre}</p>
-        <p><strong>💰 Precio venta:</strong> $${Number(producto.precio).toLocaleString('es-ES')}</p>
-        <p><strong>📊 Stock actual:</strong> ${producto.stock || 0} unidades</p>
-    `;
-    document.getElementById('modalCantidad').style.display = 'flex';
-    document.getElementById('cantidadRecibida').focus();
-}
 
-   function confirmarAgregarProducto() {
-    const cantidad = parseInt(document.getElementById('cantidadRecibida').value);
-    const precioCompra = obtenerValorNumerico('precioCompra') || productoEscaneadoTemporal.precio || 0;
-    
-    if (!cantidad || cantidad <= 0) {
-        mostrarToast('❌ Ingresa una cantidad válida', 'error');
-        return;
-    }
-    
-    // Actualizar stock en localStorage
-    let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-    const index = productos.findIndex(p => p.id === productoEscaneadoTemporal.id);
-    
-    if (index !== -1) {
-        // Verificar si el precio de compra es diferente al precio actual
-        const precioActual = productos[index].precio || 0;
-        const precioNuevo = precioCompra || precioActual;
-        
-        // Actualizar stock
-        productos[index].stock = (productos[index].stock || 0) + cantidad;
-        
-        // SI EL PRECIO CAMBIÓ, ACTUALIZAR EL PRECIO DE VENTA
-        if (precioNuevo !== precioActual && precioNuevo > 0) {
-            productos[index].precio = precioNuevo;
-            console.log(`💰 Precio actualizado: ${productos[index].nombre} de $${precioActual} a $${precioNuevo}`);
+    // ==================== PROCESAR PRODUCTO ESCANEADO (SUPABASE) ====================
+    async function procesarProductoEscaneado(codigo) {
+        if (!facturaActual.numero) {
+            mostrarToast('❌ Primero inicia una factura', 'warning');
+            return;
         }
         
-        localStorage.setItem('pos_productos', JSON.stringify(productos));
-        console.log(`✅ Stock actualizado: ${productos[index].nombre} ahora tiene ${productos[index].stock} unidades`);
+        console.log('📡 Escaneado código:', codigo);
+        
+        try {
+            // Buscar en Supabase por código
+            const response = await fetch(`${API_URL}?codigo=${encodeURIComponent(codigo.trim().toUpperCase())}`);
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+            
+            const productos = result.data || [];
+            if (productos.length === 0) {
+                mostrarToast(`❌ Producto "${codigo}" no encontrado`, 'error');
+                return;
+            }
+            
+            const producto = productos[0];
+            console.log('✅ Producto encontrado:', producto);
+            
+            productoEscaneadoTemporal = producto;
+            document.getElementById('infoProductoModal').innerHTML = `
+                <p><strong>📦 Producto:</strong> ${producto.nombre}</p>
+                <p><strong>💰 Precio venta:</strong> $${Number(producto.precio).toLocaleString('es-CO')}</p>
+                <p><strong>📊 Stock actual:</strong> ${producto.stock || 0} unidades</p>
+            `;
+            document.getElementById('modalCantidad').style.display = 'flex';
+            document.getElementById('cantidadRecibida').focus();
+        } catch (error) {
+            console.error('Error al buscar producto:', error);
+            mostrarToast('❌ Error: ' + error.message, 'error');
+        }
     }
-    
-    // Agregar a la factura
-    facturaActual.productos.push({
-        producto_id: productoEscaneadoTemporal.id,
-        nombre: productoEscaneadoTemporal.nombre,
-        codigo: productoEscaneadoTemporal.codigo,
-        cantidad: cantidad,
-        precio_compra: precioCompra,
-        precio_venta: productoEscaneadoTemporal.precio,
-        subtotal: cantidad * precioCompra
-    });
-    
-    actualizarListaFactura();
-    actualizarResumenStock();
-    actualizarContadorProductos();
-    
-    // Mostrar mensaje con el precio actualizado
-    let mensaje = `✅ ${cantidad} de ${productoEscaneadoTemporal.nombre} agregadas`;
-    if (precioCompra > 0 && precioCompra !== productoEscaneadoTemporal.precio) {
-        mensaje += `\n💰 Precio actualizado a $${precioCompra.toLocaleString('es-ES')}`;
+
+    // ==================== CONFIRMAR RECEPCIÓN DE PRODUCTO (SUPABASE) ====================
+    async function confirmarAgregarProducto() {
+        const cantidad = parseInt(document.getElementById('cantidadRecibida').value);
+        const precioCompra = obtenerValorNumerico('precioCompra') || productoEscaneadoTemporal.precio || 0;
+        
+        if (!cantidad || cantidad <= 0) {
+            mostrarToast('❌ Ingresa una cantidad válida', 'error');
+            return;
+        }
+        
+        try {
+            const producto = productoEscaneadoTemporal;
+            const stockAnterior = producto.stock || 0;
+            const precioActual = producto.precio || 0;
+            const nuevoStock = stockAnterior + cantidad;
+            
+            // Preparar datos para actualizar
+            const updateData = { stock: nuevoStock };
+            if (precioCompra > 0 && precioCompra !== precioActual) {
+                updateData.precio = precioCompra;
+            }
+            
+            // Actualizar en Supabase
+            const updateResponse = await fetch(`${API_URL}?id=${producto.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+            
+            const updateResult = await updateResponse.json();
+            if (!updateResult.success) {
+                throw new Error(updateResult.error);
+            }
+            
+            // Agregar a la factura local
+            facturaActual.productos.push({
+                producto_id: producto.id,
+                nombre: producto.nombre,
+                codigo: producto.codigo,
+                cantidad: cantidad,
+                precio_compra: precioCompra,
+                precio_venta: producto.precio,
+                subtotal: cantidad * precioCompra
+            });
+            
+            actualizarListaFactura();
+            await actualizarResumenStock();
+            actualizarContadorProductos();
+            
+            let mensaje = `✅ ${cantidad} de ${producto.nombre} agregadas`;
+            if (precioCompra > 0 && precioCompra !== precioActual) {
+                mensaje += ` | 💰 Precio actualizado a $${precioCompra.toLocaleString('es-CO')}`;
+            }
+            mostrarToast(mensaje, 'success');
+            
+            cerrarModalCantidad();
+            document.getElementById('cantidadRecibida').value = '';
+            document.getElementById('precioCompra').value = '';
+        } catch (error) {
+            console.error('Error al confirmar:', error);
+            mostrarToast('❌ Error: ' + error.message, 'error');
+        }
     }
-    mostrarToast(mensaje, 'success');
-    
-    cerrarModalCantidad();
-    document.getElementById('cantidadRecibida').value = '';
-    document.getElementById('precioCompra').value = '';
-}
 
-
-    
     function cerrarModalCantidad() {
         document.getElementById('modalCantidad').style.display = 'none';
         productoEscaneadoTemporal = null;
         document.getElementById('scannerInput').focus();
     }
-    
+
+    // ==================== ACTUALIZAR LISTA DE LA FACTURA ====================
     function actualizarListaFactura() {
         const container = document.getElementById('listaProductosFactura');
         if (facturaActual.productos.length === 0) {
@@ -435,161 +426,188 @@ function getAperturaActual() {
             total += p.subtotal;
             html += `<div class="producto-agregado">
                 <div><strong>📦 ${p.nombre}</strong><br><small>Código: ${p.codigo}</small></div>
-                <div><span class="cantidad-badge">${p.cantidad} ud</span> <span>$${p.subtotal.toLocaleString('es-ES')}</span>
+                <div><span class="cantidad-badge">${p.cantidad} ud</span> <span>$${p.subtotal.toLocaleString('es-CO')}</span>
                 <button onclick="eliminarProductoFactura(${i})" style="background:#e74c3c; color:white; border:none; border-radius:5px; padding:5px 10px; cursor:pointer;">🗑️</button></div>
             </div>`;
         });
-        html += `<div style="margin-top:15px; padding:10px; background:#ecf0f1; border-radius:10px;"><strong>💰 Total: $${total.toLocaleString('es-ES')}</strong></div>`;
+        html += `<div style="margin-top:15px; padding:10px; background:#ecf0f1; border-radius:10px;"><strong>💰 Total: $${total.toLocaleString('es-CO')}</strong></div>`;
         container.innerHTML = html;
     }
-   function eliminarProductoFactura(index) {
-    const p = facturaActual.productos[index];
-    if (confirm(`¿Eliminar ${p.nombre}?`)) {
-        // Restar el stock que se había agregado
-        let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-        const idx = productos.findIndex(prod => prod.id === p.producto_id);
-        if (idx !== -1) {
-            productos[idx].stock = Math.max(0, (productos[idx].stock || 0) - p.cantidad);
-            
-            // Si el precio de compra era diferente, NO revertimos el precio (se queda el nuevo precio)
-            // porque el precio ya se actualizó en el inventario
-            
-            localStorage.setItem('pos_productos', JSON.stringify(productos));
-        }
+
+    // ==================== ELIMINAR PRODUCTO DE LA FACTURA ====================
+    async function eliminarProductoFactura(index) {
+        const p = facturaActual.productos[index];
+        if (!confirm(`¿Eliminar ${p.nombre}?`)) return;
         
-        facturaActual.productos.splice(index, 1);
-        actualizarListaFactura();
-        actualizarResumenStock();
-        actualizarContadorProductos();
-        mostrarToast('Producto eliminado y stock revertido', 'info');
+        try {
+            // Obtener el producto actual de Supabase
+            const getResponse = await fetch(`${API_URL}?id=${p.producto_id}`);
+            const getResult = await getResponse.json();
+            
+            if (!getResult.success || !getResult.data[0]) {
+                throw new Error('Producto no encontrado');
+            }
+            
+            const producto = getResult.data[0];
+            const nuevoStock = Math.max(0, (producto.stock || 0) - p.cantidad);
+            
+            // Actualizar stock en Supabase
+            await fetch(`${API_URL}?id=${p.producto_id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stock: nuevoStock })
+            });
+            
+            // Eliminar de la factura local
+            facturaActual.productos.splice(index, 1);
+            actualizarListaFactura();
+            await actualizarResumenStock();
+            actualizarContadorProductos();
+            mostrarToast('Producto eliminado y stock revertido', 'info');
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarToast('❌ Error: ' + error.message, 'error');
+        }
     }
-}
+
     function actualizarContadorProductos() {
         const total = facturaActual.productos.reduce((s, p) => s + p.cantidad, 0);
         document.getElementById('totalProductosFactura').textContent = total;
     }
-    
-    function finalizarFactura() {
-    if (facturaActual.productos.length === 0) {
-        mostrarToast('❌ No hay productos', 'error');
-        return;
-    }
-    
-    const total = facturaActual.productos.reduce((s, p) => s + p.subtotal, 0);
-    
-    // Registrar las actualizaciones de precio en el historial
-    let historial = JSON.parse(localStorage.getItem('facturas_compra')) || [];
-    historial.unshift({ 
-        ...facturaActual, 
-        total,
-        fecha_finalizacion: new Date().toISOString()
-    });
-    localStorage.setItem('facturas_compra', JSON.stringify(historial));
-    
-    // Mostrar resumen de precios actualizados
-    let mensaje = `✅ Factura ${facturaActual.numero} finalizada. Total: $${total.toLocaleString('es-ES')}`;
-    
-    // Verificar si algún producto tuvo cambio de precio
-    const productosConCambio = facturaActual.productos.filter(p => 
-        p.precio_compra > 0 && p.precio_compra !== p.precio_venta
-    );
-    
-    if (productosConCambio.length > 0) {
-        mensaje += '\n💰 Precios actualizados:';
-        productosConCambio.forEach(p => {
-            mensaje += `\n  - ${p.nombre}: $${p.precio_venta} → $${p.precio_compra}`;
-        });
-    }
-    
-    mostrarToast(mensaje, 'success');
-    
-    facturaActual = { numero: null, proveedor: null, productos: [] };
-    document.getElementById('facturaNumero').innerHTML = 'No iniciada';
-    document.getElementById('facturaProveedor').innerHTML = '-';
-    document.getElementById('listaProductosFactura').innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados.</p>';
-    actualizarContadorProductos();
-    actualizarResumenStock();
-}
 
-    
-   function cancelarFactura() {
-    if (facturaActual.productos.length && confirm('¿Cancelar factura? Se revertirá el stock.')) {
-        // Restar el stock de todos los productos agregados
-        let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-        facturaActual.productos.forEach(p => {
-            const idx = productos.findIndex(prod => prod.id === p.producto_id);
-            if (idx !== -1) {
-                productos[idx].stock = Math.max(0, (productos[idx].stock || 0) - p.cantidad);
-                // NOTA: El precio NO se revierte, se mantiene el nuevo precio
-            }
-        });
-        localStorage.setItem('pos_productos', JSON.stringify(productos));
+    // ==================== FINALIZAR FACTURA ====================
+    async function finalizarFactura() {
+        if (facturaActual.productos.length === 0) {
+            mostrarToast('❌ No hay productos', 'error');
+            return;
+        }
         
-        facturaActual = { numero: null, proveedor: null, productos: [] };
-        document.getElementById('facturaNumero').innerHTML = 'No iniciada';
-        document.getElementById('facturaProveedor').innerHTML = '-';
-        document.getElementById('listaProductosFactura').innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados.</p>';
-        actualizarContadorProductos();
-        actualizarResumenStock();
-        mostrarToast('Factura cancelada y stock revertido', 'info');
+        try {
+            const total = facturaActual.productos.reduce((s, p) => s + p.subtotal, 0);
+            
+            // Registrar la factura en Supabase (tabla facturas_compra)
+            const facturaData = {
+                numero: facturaActual.numero,
+                proveedor: facturaActual.proveedor,
+                productos: JSON.stringify(facturaActual.productos),
+                total: total,
+                fecha_inicio: facturaActual.fecha,
+                fecha_finalizacion: new Date().toISOString()
+            };
+            
+            const response = await fetch('../../php/api/facturas.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(facturaData)
+            });
+            
+            const result = await response.json();
+            
+            let mensaje = `✅ Factura ${facturaActual.numero} finalizada. Total: $${total.toLocaleString('es-CO')}`;
+            
+            const productosConCambio = facturaActual.productos.filter(p => 
+                p.precio_compra > 0 && p.precio_compra !== p.precio_venta
+            );
+            
+            if (productosConCambio.length > 0) {
+                mensaje += '\n💰 Precios actualizados:';
+                productosConCambio.forEach(p => {
+                    mensaje += `\n  - ${p.nombre}: $${p.precio_venta} → $${p.precio_compra}`;
+                });
+            }
+            
+            mostrarToast(mensaje, 'success');
+            
+            facturaActual = { numero: null, proveedor: null, productos: [] };
+            document.getElementById('facturaNumero').innerHTML = 'No iniciada';
+            document.getElementById('facturaProveedor').innerHTML = '-';
+            document.getElementById('listaProductosFactura').innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados.</p>';
+            actualizarContadorProductos();
+            await actualizarResumenStock();
+        } catch (error) {
+            console.error('Error al finalizar factura:', error);
+            mostrarToast('❌ Error: ' + error.message, 'error');
+        }
     }
-}
-    
-   function actualizarResumenStock() {
-    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-    const tbody = document.getElementById('resumenStock');
-    
-    if (productos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4">📭 No hay productos registrados</td></tr>';
-        return;
-    }
-    
-    let html = '';
-    productos.forEach(p => {
-        const stock = p.stock || 0;
-        const stockMinimo = p.stock_minimo || 5;
-        const estado = stock <= stockMinimo ? '🔴 Bajo' : '✅ OK';
-        const color = stock <= stockMinimo ? '#e74c3c' : '#27ae60';
-        html += `
-            <tr>
-                <td><strong>${p.nombre}</strong><br><small>${p.codigo}</small></td>
-                <td style="color:${color}; font-weight:bold;">${stock}</td>
-                <td>${stockMinimo}</td>
-                <td>${estado}</td>
-            </tr>
-        `;
-    });
-    tbody.innerHTML = html;
-}
 
-    
-    function abrirModalAgregarProducto(codigo) {
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.style.display = 'flex';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header"><h2>🆕 Nuevo Producto</h2><span class="close-modal" onclick="this.closest('.modal').remove()">&times;</span></div>
-                <div class="form-group"><label>Código:</label><input type="text" id="nuevoCodigo" value="${codigo}" readonly style="background:#f0f0f0;"></div>
-                <div class="form-group"><label>Nombre:</label><input type="text" id="nuevoNombre" placeholder="Ej: Coca-Cola 400ml"></div>
-                <div class="form-group"><label>Precio venta:</label><input type="number" id="nuevoPrecio" placeholder="Ej: 2500"></div>
-                <div class="form-group"><label>Categoría:</label><input type="text" id="nuevaCategoria" value="Bebidas"></div>
-                <button onclick="agregarProductoNuevo(this, '${codigo}')" class="btn btn-success">✅ Agregar</button>
-            </div>
-        `;
-        document.body.appendChild(modal);
+    // ==================== CANCELAR FACTURA ====================
+    async function cancelarFactura() {
+        if (facturaActual.productos.length === 0) return;
+        if (!confirm('¿Cancelar factura? Se revertirá el stock.')) return;
+        
+        try {
+            // Revertir el stock de todos los productos agregados
+            for (const p of facturaActual.productos) {
+                const getResponse = await fetch(`${API_URL}?id=${p.producto_id}`);
+                const getResult = await getResponse.json();
+                
+                if (getResult.success && getResult.data[0]) {
+                    const producto = getResult.data[0];
+                    const nuevoStock = Math.max(0, (producto.stock || 0) - p.cantidad);
+                    
+                    await fetch(`${API_URL}?id=${p.producto_id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ stock: nuevoStock })
+                    });
+                }
+            }
+            
+            facturaActual = { numero: null, proveedor: null, productos: [] };
+            document.getElementById('facturaNumero').innerHTML = 'No iniciada';
+            document.getElementById('facturaProveedor').innerHTML = '-';
+            document.getElementById('listaProductosFactura').innerHTML = '<p style="text-align: center; color: gray;">No hay productos agregados.</p>';
+            actualizarContadorProductos();
+            await actualizarResumenStock();
+            mostrarToast('Factura cancelada y stock revertido', 'info');
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarToast('❌ Error: ' + error.message, 'error');
+        }
     }
-    
-    function agregarProductoNuevo(btn, codigo) {
-        const nombre = document.getElementById('nuevoNombre').value;
-        const precio = parseFloat(document.getElementById('nuevoPrecio').value);
-        if (!nombre || !precio) { mostrarToast('❌ Completa los datos', 'error'); return; }
-        agregarProducto(codigo, nombre, precio, 0, 5, document.getElementById('nuevaCategoria').value, 'Proveedor', null);
-        mostrarToast(`✅ ${nombre} agregado`, 'success');
-        btn.closest('.modal').remove();
-        actualizarResumenStock();
+
+    // ==================== ACTUALIZAR RESUMEN DE STOCK (SUPABASE) ====================
+    async function actualizarResumenStock() {
+        const tbody = document.getElementById('resumenStock');
+        if (!tbody) return;
+        
+        try {
+            const response = await fetch(API_URL);
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+            
+            const productos = result.data || [];
+            
+            if (productos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">📭 No hay productos registrados</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            productos.forEach(p => {
+                const stock = p.stock || 0;
+                const stockMinimo = p.stock_minimo || 5;
+                const estado = stock <= stockMinimo ? '🔴 Bajo' : '✅ OK';
+                const color = stock <= stockMinimo ? '#e74c3c' : '#27ae60';
+                html += `
+                    <tr>
+                        <td><strong>${p.nombre}</strong><br><small>${p.codigo}</small></td>
+                        <td style="color:${color}; font-weight:bold;">${stock}</td>
+                        <td>${stockMinimo}</td>
+                        <td>${estado}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        } catch (error) {
+            console.error('Error:', error);
+            tbody.innerHTML = '<tr><td colspan="4" style="color:red;">❌ Error al cargar productos</td></tr>';
+        }
     }
-    
+
     // ==================== INICIALIZACIÓN ====================
     document.addEventListener('DOMContentLoaded', function() {
         console.log('🔧 Inicializando Recibir Pedido...');
@@ -597,8 +615,8 @@ function getAperturaActual() {
         actualizarEstadoTurno();
         actualizarResumenStock();
         
-        // Actualizar cada 5 segundos
-        setInterval(actualizarEstadoTurno, 5000);
+        // Actualizar cada 30 segundos
+        setInterval(actualizarEstadoTurno, 30000);
         
         const scannerInput = document.getElementById('scannerInput');
         if (scannerInput) {
@@ -621,9 +639,11 @@ function getAperturaActual() {
         
         console.log('✅ Recibir Pedido inicializado correctamente');
     });
-    
-    // Exponer funciones globales
+
+    // ==================== EXPONER FUNCIONES GLOBALES ====================
     window.iniciarNuevaFactura = iniciarNuevaFactura;
+    window.guardarNuevaFactura = guardarNuevaFactura;
+    window.cerrarModalNuevaFactura = cerrarModalNuevaFactura;
     window.finalizarFactura = finalizarFactura;
     window.cancelarFactura = cancelarFactura;
     window.eliminarProductoFactura = eliminarProductoFactura;
@@ -632,7 +652,8 @@ function getAperturaActual() {
     window.formatearNumero = formatearNumero;
     window.formatearNumeroCompleto = formatearNumeroCompleto;
     window.actualizarEstadoTurno = actualizarEstadoTurno;
-    window.getAperturaActual = getAperturaActual;
+    window.procesarProductoEscaneado = procesarProductoEscaneado;
+    window.actualizarResumenStock = actualizarResumenStock;
 </script>
 
 </body>

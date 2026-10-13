@@ -308,300 +308,205 @@
     </div>
 </div>
     <script>
+    // ============================================================
+    // API DE PRODUCTOS (conexión con Supabase)
+    // ============================================================
+   const API_URL = '../../php/api/productos.php';
 
-        // ========== AGREGAR RÁPIDO POR CÓDIGO ==========
-function agregarRapidoPorCodigo() {
-    const input = document.getElementById('scannerInput');
-    const codigo = input.value.trim();
-    
-    if (!codigo) {
-        alert('⚠️ Primero escanea o escribe un código de barras');
-        return;
+    // ========== VARIABLES GLOBALES ==========
+    let productosCache = [];
+
+    // ========== FORMATEAR NÚMEROS ==========
+    function formatMoney(valor) {
+        if (valor === undefined || valor === null || isNaN(valor)) return '$0';
+        return '$' + Number(valor).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
-    
-    // Verificar si el producto ya existe
-    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-    const existe = productos.find(p => p.codigo && p.codigo.toUpperCase() === codigo.toUpperCase());
-    
-    if (existe) {
-        alert(`❌ El producto "${existe.nombre}" ya existe con el código ${codigo}`);
-        return;
-    }
-    
-    // Abrir modal con el código precargado
-    document.getElementById('rapidoCodigo').value = codigo;
-    document.getElementById('rapidoCodigoInput').value = codigo;
-    document.getElementById('rapidoCodigoMostrar').textContent = codigo;
-    document.getElementById('rapidoNombre').value = '';
-    document.getElementById('rapidoPrecio').value = '';
-    document.getElementById('rapidoStock').value = 0;
-    document.getElementById('rapidoMinimo').value = 5;
-    document.getElementById('rapidoCategoria').value = '';
-    
-    document.getElementById('modalAgregarRapido').classList.add('show');
-    document.getElementById('modalAgregarRapido').style.display = 'flex';
-    document.getElementById('rapidoNombre').focus();
-    
-    // Limpiar el input de búsqueda
-    input.value = '';
-}
 
-// ========== GUARDAR PRODUCTO RÁPIDO ==========
-function guardarProductoRapido() {
-    const codigo = document.getElementById('rapidoCodigo').value.trim();
-    const nombre = document.getElementById('rapidoNombre').value.trim();
-    const precio = document.getElementById('rapidoPrecio').value;
-    const stock = document.getElementById('rapidoStock').value;
-    const stockMinimo = document.getElementById('rapidoMinimo').value;
-    const categoria = document.getElementById('rapidoCategoria').value.trim();
-    
-    // Validaciones
-    if (!codigo) {
-        alert('⚠️ El código es obligatorio');
-        return;
-    }
-    
-    if (!nombre) {
-        alert('⚠️ Ingresa el nombre del producto');
-        document.getElementById('rapidoNombre').focus();
-        return;
-    }
-    
-    if (!precio || parseFloat(precio) <= 0) {
-        alert('⚠️ Ingresa un precio válido (mayor a 0)');
-        document.getElementById('rapidoPrecio').focus();
-        return;
-    }
-    
-    if (stock === '' || parseInt(stock) < 0) {
-        alert('⚠️ Ingresa un stock válido (0 o más)');
-        document.getElementById('rapidoStock').focus();
-        return;
-    }
-    
-    // Verificar que no exista otro producto con el mismo código
-    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-    const existe = productos.find(p => p.codigo && p.codigo.toUpperCase() === codigo.toUpperCase());
-    
-    if (existe) {
-        alert(`❌ Ya existe un producto con el código "${codigo}"`);
-        return;
-    }
-    
-    // Crear el nuevo producto
-    const nuevoProducto = {
-        id: Date.now() + Math.random() * 100,
-        codigo: codigo,
-        nombre: nombre,
-        precio: parseFloat(precio),
-        stock: parseInt(stock),
-        stock_minimo: parseInt(stockMinimo) || 5,
-        categoria: categoria || 'Sin categoría',
-        proveedor: 'Agregado rápido'
-    };
-    
-    productos.push(nuevoProducto);
-    localStorage.setItem('pos_productos', JSON.stringify(productos));
-    
-    // Cerrar modal y actualizar
-    cerrarModalAgregarRapido();
-    cargarInventario();
-    
-    alert(`✅ Producto "${nombre}" creado exitosamente!\n📦 Código: ${codigo}\n💰 Precio: $${parseFloat(precio).toLocaleString('es-CO')}\n📊 Stock: ${stock}`);
-}
+    // ========== CARGAR INVENTARIO (DESDE SUPABASE) ==========
+    async function cargarInventario() {
+        const tbody = document.getElementById('tablaInventario');
+        tbody.innerHTML = '<tr><td colspan="7">⏳ Cargando productos...</td></tr>';
 
+        try {
+            const response = await fetch(API_URL);
+            const result = await response.json();
 
-
-
-// ========== CERRAR MODAL AGREGAR RÁPIDO ==========
-function cerrarModalAgregarRapido() {
-    document.getElementById('modalAgregarRapido').style.display = 'none';
-    document.getElementById('modalAgregarRapido').classList.remove('show');
-}
-
-document.addEventListener('click', function(e) {
-    const modales = ['modalNuevoProducto', 'modalEditarProducto', 'modalRecibirPedido', 'modalEliminarProducto', 'modalAgregarRapido'];
-    modales.forEach(id => {
-        const modal = document.getElementById(id);
-        if (modal && e.target === modal) {
-            modal.style.display = 'none';
-            modal.classList.remove('show');
-        }
-    });
-});
-
-        // ========== VARIABLES GLOBALES ==========
-        let productosCache = [];
-
-        // ========== CARGAR INVENTARIO ==========
-        function cargarInventario() {
-            const tbody = document.getElementById('tablaInventario');
-            tbody.innerHTML = '<tr><td colspan="7">⏳ Cargando productos...</td></tr>';
-            
-            try {
-                const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-                
-                if (productos.length > 0) {
-                    productosCache = productos;
-                    renderizarTabla(productos);
-                    actualizarAlertas(productos);
-                } else {
-                    // Productos de ejemplo
-                    const productosEjemplo = [
-                        { id: 1, codigo: 'BEB001', nombre: 'Gaseosa Coca-Cola 600ml', precio: 4000, stock: 80, stock_minimo: 15, categoria: 'Bebidas', proveedor: 'Coca-Cola' },
-                        { id: 2, codigo: 'BEB002', nombre: 'Gaseosa Coca-Cola 1.5L', precio: 8000, stock: 40, stock_minimo: 8, categoria: 'Bebidas', proveedor: 'Coca-Cola' },
-                        { id: 3, codigo: 'BEB003', nombre: 'Agua Cristal 600ml', precio: 2500, stock: 3, stock_minimo: 8, categoria: 'Bebidas', proveedor: 'Cristal' },
-                        { id: 4, codigo: 'BEB004', nombre: 'Jugo Hit Manzana', precio: 3000, stock: 5, stock_minimo: 5, categoria: 'Bebidas', proveedor: 'Hit' },
-                        { id: 5, codigo: 'BEB005', nombre: 'Jugo Hit Naranja', precio: 3000, stock: 10, stock_minimo: 5, categoria: 'Bebidas', proveedor: 'Hit' },
-                        { id: 6, codigo: 'PASTEL001', nombre: 'Pastel Tradicional', precio: 2000, stock: 50, stock_minimo: 10, categoria: 'Pasteles', proveedor: 'Proveedor A' },
-                        { id: 7, codigo: 'PASTEL002', nombre: 'Pastel de Fresa', precio: 2500, stock: 30, stock_minimo: 8, categoria: 'Pasteles', proveedor: 'Proveedor A' },
-                        { id: 8, codigo: 'PASTEL003', nombre: 'Pastel de Vainilla', precio: 2200, stock: 40, stock_minimo: 10, categoria: 'Pasteles', proveedor: 'Proveedor A' }
-                    ];
-                    localStorage.setItem('pos_productos', JSON.stringify(productosEjemplo));
-                    productosCache = productosEjemplo;
-                    renderizarTabla(productosEjemplo);
-                    actualizarAlertas(productosEjemplo);
-                }
-            } catch (error) {
-                console.error('❌ Error:', error);
-                tbody.innerHTML = `<tr><td colspan="7">❌ Error: ${error.message}</td></tr>`;
+            if (!result.success) {
+                throw new Error(result.error || 'Error al cargar productos');
             }
+
+            const productos = result.data || [];
+            productosCache = productos;
+            renderizarTabla(productos);
+            actualizarAlertas(productos);
+
+            console.log(`✅ ${productos.length} productos cargados desde Supabase`);
+        } catch (error) {
+            console.error('❌ Error:', error);
+            tbody.innerHTML = `<tr><td colspan="7" style="color:red;">❌ Error: ${error.message}</td></tr>`;
+        }
+    }
+
+    // ========== RENDERIZAR TABLA ==========
+    function renderizarTabla(productos) {
+        const tbody = document.getElementById('tablaInventario');
+
+        if (!productos || productos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7">📭 No hay productos registrados</td></tr>';
+            return;
         }
 
-        // ========== RENDERIZAR TABLA ==========
-        function renderizarTabla(productos) {
-            const tbody = document.getElementById('tablaInventario');
-            
-            if (!productos || productos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7">📭 No hay productos registrados</td></tr>';
-                return;
-            }
-            
-            let html = '';
-            productos.forEach(p => {
-                const stockBajo = Number(p.stock) <= Number(p.stock_minimo) ? 'style="color: red; font-weight: bold;"' : '';
-                html += `
-                    <tr>
-                        <td><strong>${p.codigo}</strong></td>
-                        <td>${p.nombre}</td>
-                        <td>$${Number(p.precio).toLocaleString('es-CO')}</td>
-                        <td ${stockBajo}>${p.stock}</td>
-                        <td>${p.stock_minimo}</td>
-                        <td>${p.categoria || 'Sin categoría'}</td>
-                        <td>
-                            <button onclick="editarProducto(${p.id})" class="btn-sm btn-edit">✏️</button>
-                            <button onclick="recibirPedido(${p.id})" class="btn-sm btn-receive">📦</button>
-                            <button onclick="eliminarProducto(${p.id})" class="btn-sm btn-delete">🗑️</button>
-                        </td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = html;
+        let html = '';
+        productos.forEach(p => {
+            const stockBajo = Number(p.stock) <= Number(p.stock_minimo)
+                ? 'style="color: red; font-weight: bold;"'
+                : '';
+
+            html += `
+                <tr>
+                    <td><strong>${p.codigo}</strong></td>
+                    <td>${p.nombre}</td>
+                    <td>${formatMoney(p.precio)}</td>
+                    <td ${stockBajo}>${p.stock}</td>
+                    <td>${p.stock_minimo}</td>
+                    <td>${p.categoria || 'Sin categoría'}</td>
+                    <td>
+                        <button onclick="editarProducto(${p.id})" class="btn-sm btn-edit">✏️</button>
+                        <button onclick="recibirPedido(${p.id})" class="btn-sm btn-receive">📦</button>
+                        <button onclick="eliminarProducto(${p.id})" class="btn-sm btn-delete">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    // ========== ACTUALIZAR ALERTAS ==========
+    function actualizarAlertas(productos) {
+        const criticos = productos.filter(p => Number(p.stock) <= Number(p.stock_minimo));
+        const container = document.getElementById('alertasStock');
+
+        if (criticos.length === 0) {
+            container.innerHTML = '<p>✅ No hay productos con stock crítico</p>';
+            return;
         }
 
-        // ========== ACTUALIZAR ALERTAS ==========
-        function actualizarAlertas(productos) {
-            const criticos = productos.filter(p => Number(p.stock) <= Number(p.stock_minimo));
-            const container = document.getElementById('alertasStock');
-            
-            if (criticos.length === 0) {
-                container.innerHTML = '<p>✅ No hay productos con stock crítico</p>';
-                return;
-            }
-            
-            let html = '';
-            criticos.forEach(p => {
-                html += `
-                    <div style="padding:10px; margin:5px 0; background:#fff3e0; border-radius:8px; border-left: 4px solid #e67e22;">
-                        ⚠️ <strong>${p.nombre}</strong> (${p.codigo}): stock ${p.stock} (mínimo ${p.stock_minimo})
-                        <button onclick="recibirPedido(${p.id})" style="float:right; background:#27ae60; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;">📦 Recibir</button>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
+        let html = '';
+        criticos.forEach(p => {
+            html += `
+                <div style="padding:10px; margin:5px 0; background:#fff3e0; border-radius:8px; border-left: 4px solid #e67e22;">
+                    ⚠️ <strong>${p.nombre}</strong> (${p.codigo}): stock ${p.stock} (mínimo ${p.stock_minimo})
+                    <button onclick="recibirPedido(${p.id})" style="float:right; background:#27ae60; border:none; color:white; padding:5px 10px; border-radius:5px; cursor:pointer;">📦 Recibir</button>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    // ========== BUSCAR PRODUCTO POR CÓDIGO ==========
+    async function buscarProductoPorCodigoInventario() {
+        const input = document.getElementById('scannerInput');
+        const codigo = input.value.trim();
+
+        if (!codigo) {
+            renderizarTabla(productosCache);
+            return;
         }
 
-        // ========== BUSCAR PRODUCTO ==========
-        function buscarProductoPorCodigoInventario() {
-            const input = document.getElementById('scannerInput');
-            const codigo = input.value.trim();
-            
-            if (!codigo) {
-                renderizarTabla(productosCache);
-                return;
+        try {
+            const response = await fetch(`${API_URL}?codigo=${encodeURIComponent(codigo.toUpperCase())}`);
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error);
             }
-            
-            const localProductos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-            const encontrado = localProductos.filter(p => 
-                p.codigo && p.codigo.toUpperCase() === codigo.toUpperCase()
-            );
-            
-            if (encontrado.length > 0) {
-                renderizarTabla(encontrado);
-                alert(`✅ ${encontrado.length} producto(s) encontrado(s)`);
+
+            const encontrados = result.data || [];
+            if (encontrados.length > 0) {
+                renderizarTabla(encontrados);
+                alert(`✅ ${encontrados.length} producto(s) encontrado(s)`);
             } else {
                 alert(`❌ No se encontró el producto "${codigo}"`);
                 renderizarTabla(productosCache);
             }
-            input.value = '';
+        } catch (error) {
+            console.error('Error al buscar:', error);
+            alert('❌ Error al buscar: ' + error.message);
         }
 
-        // ========== GUARDAR NUEVO PRODUCTO ==========
-        function guardarNuevoProductoInventario() {
-            const codigo = document.getElementById('nuevoProductoCodigo').value.trim();
-            const nombre = document.getElementById('nuevoProductoNombre').value.trim();
-            const precio = document.getElementById('nuevoProductoPrecio').value;
-            const stock = document.getElementById('nuevoProductoStock').value;
-            const stock_minimo = document.getElementById('nuevoProductoMinimo').value;
-            const categoria = document.getElementById('nuevoProductoCategoria').value.trim();
-            const proveedor = document.getElementById('nuevoProductoProveedor').value.trim();
+        input.value = '';
+    }
 
-            if (!codigo || !nombre || !precio || !stock) {
-                alert('⚠️ Todos los campos son obligatorios');
-                return;
+    // ========== GUARDAR NUEVO PRODUCTO (EN SUPABASE) ==========
+    async function guardarNuevoProductoInventario() {
+        const codigo = document.getElementById('nuevoProductoCodigo').value.trim();
+        const nombre = document.getElementById('nuevoProductoNombre').value.trim();
+        const precio = document.getElementById('nuevoProductoPrecio').value;
+        const stock = document.getElementById('nuevoProductoStock').value;
+        const stock_minimo = document.getElementById('nuevoProductoMinimo').value;
+        const categoria = document.getElementById('nuevoProductoCategoria').value.trim();
+        const proveedor = document.getElementById('nuevoProductoProveedor').value.trim();
+
+        if (!codigo || !nombre || !precio || !stock) {
+            alert('⚠️ Los campos Código, Nombre, Precio y Stock son obligatorios');
+            return;
+        }
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    codigo: codigo,
+                    nombre: nombre,
+                    precio: parseFloat(precio),
+                    stock: parseInt(stock),
+                    stock_minimo: parseInt(stock_minimo) || 5,
+                    categoria: categoria || 'Sin categoría',
+                    proveedor: proveedor || 'Sin proveedor'
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error);
             }
 
-            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-            const nuevoProducto = {
-                id: Date.now(),
-                codigo: codigo,
-                nombre: nombre,
-                precio: parseFloat(precio),
-                stock: parseInt(stock),
-                stock_minimo: parseInt(stock_minimo) || 5,
-                categoria: categoria || 'Sin categoría',
-                proveedor: proveedor || 'Sin proveedor'
-            };
-            productos.push(nuevoProducto);
-            localStorage.setItem('pos_productos', JSON.stringify(productos));
-            
             alert('✅ Producto creado exitosamente');
             cerrarModalNuevoProducto();
-            cargarInventario();
+            await cargarInventario();
+        } catch (error) {
+            console.error('Error al guardar:', error);
+            alert('❌ Error: ' + error.message);
         }
+    }
 
-        // ========== ABRIR/CERRAR MODAL NUEVO ==========
-        function abrirModalAgregarProducto() {
-            document.getElementById('modalNuevoProducto').classList.add('show');
-            document.getElementById('modalNuevoProducto').style.display = 'flex';
-            document.getElementById('nuevoProductoCodigo').focus();
-        }
+    // ========== ABRIR/CERRAR MODALES ==========
+    function abrirModalAgregarProducto() {
+        document.getElementById('modalNuevoProducto').classList.add('show');
+        document.getElementById('modalNuevoProducto').style.display = 'flex';
+        document.getElementById('nuevoProductoCodigo').focus();
+    }
 
-        function cerrarModalNuevoProducto() {
-            document.getElementById('modalNuevoProducto').style.display = 'none';
-            document.getElementById('modalNuevoProducto').classList.remove('show');
-        }
+    function cerrarModalNuevoProducto() {
+        document.getElementById('modalNuevoProducto').style.display = 'none';
+        document.getElementById('modalNuevoProducto').classList.remove('show');
+    }
 
-        // ========== EDITAR PRODUCTO ==========
-        function editarProducto(id) {
-            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-            const producto = productos.find(p => p.id === id);
-            
-            if (!producto) {
+    // ========== EDITAR PRODUCTO (DESDE SUPABASE) ==========
+    async function editarProducto(id) {
+        try {
+            const response = await fetch(`${API_URL}?id=${id}`);
+            const result = await response.json();
+
+            if (!result.success || !result.data[0]) {
                 alert('❌ Producto no encontrado');
                 return;
             }
-            
+
+            const producto = result.data[0];
+
             document.getElementById('editarProductoId').value = producto.id;
             document.getElementById('editarProductoNombre').textContent = producto.nombre;
             document.getElementById('editarProductoCodigo').textContent = 'Código: ' + producto.codigo;
@@ -609,334 +514,361 @@ document.addEventListener('click', function(e) {
             document.getElementById('editarStock').value = producto.stock;
             document.getElementById('editarStockMinimo').value = producto.stock_minimo || 5;
             document.getElementById('editarCategoria').value = producto.categoria || '';
-            
+
             document.getElementById('modalEditarProducto').classList.add('show');
             document.getElementById('modalEditarProducto').style.display = 'flex';
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al cargar producto: ' + error.message);
+        }
+    }
+
+    // ========== GUARDAR EDICIÓN (EN SUPABASE) ==========
+    async function guardarEdicion() {
+        const id = parseInt(document.getElementById('editarProductoId').value);
+        const precio = parseFloat(document.getElementById('editarPrecio').value);
+        const stock = parseInt(document.getElementById('editarStock').value);
+        const stockMinimo = parseInt(document.getElementById('editarStockMinimo').value);
+        const categoria = document.getElementById('editarCategoria').value.trim();
+
+        if (isNaN(precio) || precio < 0) {
+            alert('⚠️ Ingresa un precio válido');
+            return;
         }
 
-        function guardarEdicion() {
-            const id = parseInt(document.getElementById('editarProductoId').value);
-            const precio = parseFloat(document.getElementById('editarPrecio').value);
-            const stock = parseInt(document.getElementById('editarStock').value);
-            const stockMinimo = parseInt(document.getElementById('editarStockMinimo').value);
-            const categoria = document.getElementById('editarCategoria').value.trim();
-            
-            if (isNaN(precio) || precio < 0) {
-                alert('⚠️ Ingresa un precio válido');
-                return;
+        if (isNaN(stock) || stock < 0) {
+            alert('⚠️ Ingresa un stock válido');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}?id=${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    precio: precio,
+                    stock: stock,
+                    stock_minimo: stockMinimo,
+                    categoria: categoria
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error);
             }
-            
-            if (isNaN(stock) || stock < 0) {
-                alert('⚠️ Ingresa un stock válido');
-                return;
-            }
-            
-            let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-            const index = productos.findIndex(p => p.id === id);
-            
-            if (index === -1) {
-                alert('❌ Producto no encontrado');
-                return;
-            }
-            
-            productos[index].precio = precio;
-            productos[index].stock = stock;
-            productos[index].stock_minimo = stockMinimo;
-            productos[index].categoria = categoria || productos[index].categoria;
-            
-            localStorage.setItem('pos_productos', JSON.stringify(productos));
-            
+
             cerrarModalEditar();
-            cargarInventario();
+            await cargarInventario();
             alert('✅ Producto actualizado correctamente');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error: ' + error.message);
         }
+    }
 
-        function cerrarModalEditar() {
-            document.getElementById('modalEditarProducto').style.display = 'none';
-            document.getElementById('modalEditarProducto').classList.remove('show');
-        }
+    function cerrarModalEditar() {
+        document.getElementById('modalEditarProducto').style.display = 'none';
+        document.getElementById('modalEditarProducto').classList.remove('show');
+    }
 
-        // ========== RECIBIR PEDIDO ==========
-        function recibirPedido(id) {
-            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-            const producto = productos.find(p => p.id === id);
-            
-            if (!producto) {
+    // ========== RECIBIR PEDIDO (DESDE SUPABASE) ==========
+    async function recibirPedido(id) {
+        try {
+            const response = await fetch(`${API_URL}?id=${id}`);
+            const result = await response.json();
+
+            if (!result.success || !result.data[0]) {
                 alert('❌ Producto no encontrado');
                 return;
             }
-            
+
+            const producto = result.data[0];
+
             document.getElementById('recibirProductoId').value = producto.id;
             document.getElementById('recibirProductoNombre').textContent = producto.nombre;
             document.getElementById('recibirStockActual').textContent = producto.stock + ' unidades';
             document.getElementById('recibirCantidad').value = 1;
             document.getElementById('recibirPrecioCompra').value = '';
             document.getElementById('recibirMotivo').value = 'Pedido a proveedor';
-            
+
             document.getElementById('modalRecibirPedido').classList.add('show');
             document.getElementById('modalRecibirPedido').style.display = 'flex';
             document.getElementById('recibirCantidad').focus();
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al cargar producto: ' + error.message);
+        }
+    }
+
+    // ========== CONFIRMAR RECEPCIÓN (EN SUPABASE) ==========
+    async function confirmarRecibir() {
+        const id = parseInt(document.getElementById('recibirProductoId').value);
+        const cantidad = parseInt(document.getElementById('recibirCantidad').value);
+        const precioCompra = parseFloat(document.getElementById('recibirPrecioCompra').value) || 0;
+        const motivo = document.getElementById('recibirMotivo').value.trim() || 'Sin motivo';
+
+        if (isNaN(cantidad) || cantidad <= 0) {
+            alert('⚠️ Ingresa una cantidad válida');
+            return;
         }
 
-       function confirmarRecibir() {
-    const id = parseInt(document.getElementById('recibirProductoId').value);
-    const cantidad = parseInt(document.getElementById('recibirCantidad').value);
-    const precioCompra = parseFloat(document.getElementById('recibirPrecioCompra').value) || 0;
-    const motivo = document.getElementById('recibirMotivo').value.trim() || 'Sin motivo';
-    
-    if (isNaN(cantidad) || cantidad <= 0) {
-        alert('⚠️ Ingresa una cantidad válida');
-        return;
-    }
-    
-    let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-    const index = productos.findIndex(p => p.id === id);
-    
-    if (index === -1) {
-        alert('❌ Producto no encontrado');
-        return;
-    }
-    
-    const stockAnterior = productos[index].stock;
-    const precioActual = productos[index].precio || 0;
-    
-    // Actualizar stock
-    productos[index].stock = stockAnterior + cantidad;
-    
-    // SI EL PRECIO DE COMPRA ES DIFERENTE Y MAYOR A 0, ACTUALIZAR EL PRECIO
-    if (precioCompra > 0 && precioCompra !== precioActual) {
-        productos[index].precio = precioCompra;
-        console.log(`💰 Precio actualizado: ${productos[index].nombre} de $${precioActual} a $${precioCompra}`);
-    }
-    
-    // Guardar historial de movimientos
-    const movimientos = JSON.parse(localStorage.getItem('pos_movimientos_stock') || '[]');
-    movimientos.push({
-        id: Date.now(),
-        producto_id: id,
-        producto_nombre: productos[index].nombre,
-        tipo: 'ENTRADA',
-        cantidad: cantidad,
-        precio_compra: precioCompra,
-        precio_anterior: precioActual,
-        precio_nuevo: precioCompra > 0 ? precioCompra : precioActual,
-        stock_anterior: stockAnterior,
-        stock_nuevo: productos[index].stock,
-        motivo: motivo,
-        fecha: new Date().toISOString()
-    });
-    localStorage.setItem('pos_movimientos_stock', JSON.stringify(movimientos));
-    localStorage.setItem('pos_productos', JSON.stringify(productos));
-    
-    cerrarModalRecibir();
-    cargarInventario();
-    
-    let mensaje = `✅ Se recibieron ${cantidad} unidades de ${productos[index].nombre}\n📊 Nuevo stock: ${productos[index].stock} unidades`;
-    if (precioCompra > 0 && precioCompra !== precioActual) {
-        mensaje += `\n💰 Precio actualizado: $${precioActual} → $${precioCompra}`;
-    }
-    alert(mensaje);
-}
-        function cerrarModalRecibir() {
-            document.getElementById('modalRecibirPedido').style.display = 'none';
-            document.getElementById('modalRecibirPedido').classList.remove('show');
-        }
+        try {
+            // 1. Obtener el producto actual
+            const getResponse = await fetch(`${API_URL}?id=${id}`);
+            const getResult = await getResponse.json();
 
-        // ========== ELIMINAR PRODUCTO ==========
-        function eliminarProducto(id) {
-            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-            const producto = productos.find(p => p.id === id);
-            
-            if (!producto) {
+            if (!getResult.success || !getResult.data[0]) {
+                throw new Error('Producto no encontrado');
+            }
+
+            const producto = getResult.data[0];
+            const stockAnterior = producto.stock;
+            const precioActual = producto.precio || 0;
+            const nuevoStock = stockAnterior + cantidad;
+
+            // 2. Actualizar el producto
+            const updateData = { stock: nuevoStock };
+            if (precioCompra > 0 && precioCompra !== precioActual) {
+                updateData.precio = precioCompra;
+            }
+
+            const updateResponse = await fetch(`${API_URL}?id=${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+
+            const updateResult = await updateResponse.json();
+            if (!updateResult.success) {
+                throw new Error(updateResult.error);
+            }
+
+            cerrarModalRecibir();
+            await cargarInventario();
+
+            let mensaje = `✅ Se recibieron ${cantidad} unidades de ${producto.nombre}\n📊 Nuevo stock: ${nuevoStock} unidades`;
+            if (precioCompra > 0 && precioCompra !== precioActual) {
+                mensaje += `\n💰 Precio actualizado: $${precioActual} → $${precioCompra}`;
+            }
+            alert(mensaje);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error: ' + error.message);
+        }
+    }
+
+    function cerrarModalRecibir() {
+        document.getElementById('modalRecibirPedido').style.display = 'none';
+        document.getElementById('modalRecibirPedido').classList.remove('show');
+    }
+
+    // ========== ELIMINAR PRODUCTO (DESDE SUPABASE) ==========
+    async function eliminarProducto(id) {
+        try {
+            const response = await fetch(`${API_URL}?id=${id}`);
+            const result = await response.json();
+
+            if (!result.success || !result.data[0]) {
                 alert('❌ Producto no encontrado');
                 return;
             }
-            
+
+            const producto = result.data[0];
+
             document.getElementById('eliminarProductoId').value = producto.id;
             document.getElementById('eliminarProductoNombre').textContent = producto.nombre;
             document.getElementById('eliminarProductoCodigo').textContent = 'Código: ' + producto.codigo;
             document.getElementById('eliminarProductoStock').textContent = producto.stock;
-            
+
             document.getElementById('modalEliminarProducto').classList.add('show');
             document.getElementById('modalEliminarProducto').style.display = 'flex';
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error: ' + error.message);
+        }
+    }
+
+    // ========== CONFIRMAR ELIMINACIÓN (EN SUPABASE) ==========
+    async function confirmarEliminar() {
+        const id = parseInt(document.getElementById('eliminarProductoId').value);
+
+        try {
+            const response = await fetch(`${API_URL}?id=${id}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+
+            cerrarModalEliminar();
+            await cargarInventario();
+            alert('✅ Producto eliminado correctamente');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error: ' + error.message);
+        }
+    }
+
+    function cerrarModalEliminar() {
+        document.getElementById('modalEliminarProducto').style.display = 'none';
+        document.getElementById('modalEliminarProducto').classList.remove('show');
+    }
+
+    // ========== AGREGAR RÁPIDO (DESDE SUPABASE) ==========
+    async function agregarRapidoPorCodigo() {
+        const input = document.getElementById('scannerInput');
+        const codigo = input.value.trim();
+
+        if (!codigo) {
+            alert('⚠️ Primero escanea o escribe un código de barras');
+            return;
         }
 
-        function confirmarEliminar() {
-            const id = parseInt(document.getElementById('eliminarProductoId').value);
-            
-            let productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-            const index = productos.findIndex(p => p.id === id);
-            
-            if (index === -1) {
-                alert('❌ Producto no encontrado');
+        try {
+            const response = await fetch(`${API_URL}?codigo=${encodeURIComponent(codigo.toUpperCase())}`);
+            const result = await response.json();
+
+            if (result.data && result.data.length > 0) {
+                alert(`❌ El producto "${result.data[0].nombre}" ya existe con el código ${codigo}`);
                 return;
             }
-            
-            const nombre = productos[index].nombre;
-            productos.splice(index, 1);
-            localStorage.setItem('pos_productos', JSON.stringify(productos));
-            
-            cerrarModalEliminar();
-            cargarInventario();
-            alert(`✅ Producto "${nombre}" eliminado correctamente`);
+
+            document.getElementById('rapidoCodigo').value = codigo;
+            document.getElementById('rapidoCodigoInput').value = codigo;
+            document.getElementById('rapidoCodigoMostrar').textContent = codigo;
+            document.getElementById('rapidoNombre').value = '';
+            document.getElementById('rapidoPrecio').value = '';
+            document.getElementById('rapidoStock').value = 0;
+            document.getElementById('rapidoMinimo').value = 5;
+            document.getElementById('rapidoCategoria').value = '';
+
+            document.getElementById('modalAgregarRapido').classList.add('show');
+            document.getElementById('modalAgregarRapido').style.display = 'flex';
+            document.getElementById('rapidoNombre').focus();
+
+            input.value = '';
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error: ' + error.message);
+        }
+    }
+
+    // ========== GUARDAR PRODUCTO RÁPIDO (EN SUPABASE) ==========
+    async function guardarProductoRapido() {
+        const codigo = document.getElementById('rapidoCodigo').value.trim();
+        const nombre = document.getElementById('rapidoNombre').value.trim();
+        const precio = document.getElementById('rapidoPrecio').value;
+        const stock = document.getElementById('rapidoStock').value;
+        const stockMinimo = document.getElementById('rapidoMinimo').value;
+        const categoria = document.getElementById('rapidoCategoria').value.trim();
+
+        if (!codigo) {
+            alert('⚠️ El código es obligatorio');
+            return;
         }
 
-        function cerrarModalEliminar() {
-            document.getElementById('modalEliminarProducto').style.display = 'none';
-            document.getElementById('modalEliminarProducto').classList.remove('show');
+        if (!nombre) {
+            alert('⚠️ Ingresa el nombre del producto');
+            return;
         }
 
-        // ========== CERRAR MODALES AL HACER CLIC FUERA ==========
-        document.addEventListener('click', function(e) {
-            const modales = ['modalNuevoProducto', 'modalEditarProducto', 'modalRecibirPedido', 'modalEliminarProducto'];
-            modales.forEach(id => {
-                const modal = document.getElementById(id);
-                if (modal && e.target === modal) {
-                    modal.style.display = 'none';
-                    modal.classList.remove('show');
-                }
+        if (!precio || parseFloat(precio) <= 0) {
+            alert('⚠️ Ingresa un precio válido');
+            return;
+        }
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    codigo: codigo.toUpperCase(),
+                    nombre: nombre,
+                    precio: parseFloat(precio),
+                    stock: parseInt(stock) || 0,
+                    stock_minimo: parseInt(stockMinimo) || 5,
+                    categoria: categoria || 'Sin categoría',
+                    proveedor: 'Agregado rápido'
+                })
             });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+
+            cerrarModalAgregarRapido();
+            await cargarInventario();
+
+            alert(`✅ Producto "${nombre}" creado exitosamente!\n📦 Código: ${codigo}\n💰 Precio: $${parseFloat(precio).toLocaleString('es-CO')}\n📊 Stock: ${stock}`);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error: ' + error.message);
+        }
+    }
+
+    function cerrarModalAgregarRapido() {
+        document.getElementById('modalAgregarRapido').style.display = 'none';
+        document.getElementById('modalAgregarRapido').classList.remove('show');
+    }
+
+    // ========== CERRAR MODALES AL HACER CLIC FUERA ==========
+    document.addEventListener('click', function(e) {
+        const modales = ['modalNuevoProducto', 'modalEditarProducto', 'modalRecibirPedido', 'modalEliminarProducto', 'modalAgregarRapido'];
+        modales.forEach(id => {
+            const modal = document.getElementById(id);
+            if (modal && e.target === modal) {
+                modal.style.display = 'none';
+                modal.classList.remove('show');
+            }
         });
+    });
 
-        // ========== INICIALIZAR ==========
-        document.addEventListener('DOMContentLoaded', function() {
-            cargarInventario();
+    // ========== INICIALIZACIÓN ==========
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🔧 Inicializando inventario...');
+        cargarInventario();
 
-            const input = document.getElementById('scannerInput');
+        const input = document.getElementById('scannerInput');
+        if (input) {
             input.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     buscarProductoPorCodigoInventario();
                 }
             });
-        });
-
-
-
-
-
-        // ========== SISTEMA DE AUDITORÍA DE STOCK ==========
-function registrarMovimientoStock(productoId, productoNombre, tipo, cantidad, motivo, usuario) {
-    const movimientos = JSON.parse(localStorage.getItem('pos_movimientos_stock') || '[]');
-    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-    const producto = productos.find(p => p.id === productoId);
-    
-    movimientos.push({
-        id: Date.now(),
-        producto_id: productoId,
-        producto_nombre: productoNombre,
-        tipo: tipo, // 'VENTA', 'DEVOLUCION', 'RECEPCION', 'AJUSTE'
-        cantidad: cantidad,
-        stock_anterior: producto ? producto.stock : 0,
-        stock_nuevo: producto ? producto.stock - cantidad : 0,
-        motivo: motivo || 'Sin motivo',
-        usuario: usuario || 'Sistema',
-        fecha: new Date().toISOString(),
-        hora: new Date().toLocaleTimeString('es-CO'),
-        // Datos adicionales para auditoría
-        ip: 'local',
-        session_id: localStorage.getItem('pos_apertura_actual_id') || 'sin_apertura'
-    });
-    
-    localStorage.setItem('pos_movimientos_stock', JSON.stringify(movimientos));
-}
-
-// ========== REPORTE DE AUDITORÍA ==========
-function verReporteAuditoria() {
-    const movimientos = JSON.parse(localStorage.getItem('pos_movimientos_stock') || '[]');
-    const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-    
-    if (movimientos.length === 0) {
-        alert('📭 No hay movimientos registrados');
-        return;
-    }
-    
-    // Mostrar los últimos 50 movimientos
-    const ultimos = movimientos.slice(-50).reverse();
-    let reporte = '📊 REPORTE DE AUDITORÍA DE INVENTARIO\n';
-    reporte += '═'.repeat(50) + '\n\n';
-    
-    ultimos.forEach(m => {
-        const fecha = new Date(m.fecha);
-        const fechaStr = fecha.toLocaleDateString('es-CO') + ' ' + m.hora;
-        reporte += `📅 ${fechaStr}\n`;
-        reporte += `📦 Producto: ${m.producto_nombre}\n`;
-        reporte += `📋 Tipo: ${m.tipo}\n`;
-        reporte += `🔄 Cantidad: ${m.cantidad > 0 ? '+' : ''}${m.cantidad}\n`;
-        reporte += `📊 Stock: ${m.stock_anterior} → ${m.stock_nuevo}\n`;
-        reporte += `👤 Usuario: ${m.usuario}\n`;
-        reporte += `📝 Motivo: ${m.motivo}\n`;
-        reporte += '─'.repeat(40) + '\n';
-    });
-    
-    alert(reporte);
-}
-
-// ========== BOTÓN DE AUDITORÍA ==========
-// Agregar al HTML de inventario:
-// <button onclick="verReporteAuditoria()" class="btn btn-info">📋 Ver Auditoría</button>
-
-// ========== VENTA CON CONTROL DE STOCK ==========
-function venderBebidaConStock(aperturaId, producto) {
-    try {
-        console.log('🥤 VENDIENDO BEBIDA CON STOCK:', producto.nombre);
-        
-        // 1. Verificar stock actual
-        const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-        const productoDB = productos.find(p => p.id === producto.id);
-        
-        if (!productoDB) {
-            mostrarMensaje('❌ Producto no encontrado en inventario', 'error');
-            return null;
         }
-        
-        // 2. Validar stock disponible
-        if (productoDB.stock <= 0) {
-            mostrarMensaje(`❌ ${productoDB.nombre} - SIN STOCK (Stock: ${productoDB.stock})`, 'error');
-            return null;
-        }
-        
-        // 3. Registrar la venta
-        const venta = {
-            id: Date.now() + Math.random() * 1000,
-            apertura_id: parseInt(aperturaId),
-            producto_id: parseInt(producto.id),
-            cantidad: 1,
-            precio: producto.precio || 0,
-            subtotal: producto.precio || 0,
-            fecha: new Date().toISOString(),
-            tipo: 'bebida'
-        };
-        
-        // 4. Descontar del inventario
-        const index = productos.findIndex(p => p.id === producto.id);
-        productos[index].stock -= 1;
-        localStorage.setItem('pos_productos', JSON.stringify(productos));
-        
-        // 5. Registrar movimiento de stock (AUDITORÍA)
-        registrarMovimientoStock(
-            producto.id,
-            producto.nombre,
-            'VENTA',
-            1,
-            `Venta #${venta.id} - Apertura: ${aperturaId}`,
-            apertura.responsable || 'Empleado'
-        );
-        
-        // 6. Guardar la venta
-        const ventasBebidas = DB.get('ventas_bebidas');
-        ventasBebidas.push(venta);
-        DB.set('ventas_bebidas', ventasBebidas);
-        
-        console.log('✅ Venta registrada y stock actualizado');
-        return venta;
-        
-    } catch (e) {
-        console.error('Error en venderBebidaConStock:', e);
-        return null;
-    }
-}
 
-    </script>
+        // Refrescar cada 30 segundos
+        setInterval(cargarInventario, 30000);
+    });
+
+    // ========== EXPONER FUNCIONES GLOBALES ==========
+    window.abrirModalAgregarProducto = abrirModalAgregarProducto;
+    window.cerrarModalNuevoProducto = cerrarModalNuevoProducto;
+    window.guardarNuevoProductoInventario = guardarNuevoProductoInventario;
+    window.editarProducto = editarProducto;
+    window.guardarEdicion = guardarEdicion;
+    window.cerrarModalEditar = cerrarModalEditar;
+    window.recibirPedido = recibirPedido;
+    window.confirmarRecibir = confirmarRecibir;
+    window.cerrarModalRecibir = cerrarModalRecibir;
+    window.eliminarProducto = eliminarProducto;
+    window.confirmarEliminar = confirmarEliminar;
+    window.cerrarModalEliminar = cerrarModalEliminar;
+    window.buscarProductoPorCodigoInventario = buscarProductoPorCodigoInventario;
+    window.agregarRapidoPorCodigo = agregarRapidoPorCodigo;
+    window.guardarProductoRapido = guardarProductoRapido;
+    window.cerrarModalAgregarRapido = cerrarModalAgregarRapido;
+    window.cargarInventario = cargarInventario;
+</script>
+
+
 </body>
 </html>

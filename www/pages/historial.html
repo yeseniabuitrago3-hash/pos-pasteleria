@@ -839,316 +839,29 @@
 </div>
 
    
-    <script>
+  <script>
+    // ============================================================
+    // APIS (conexión con Supabase)
+    // ============================================================
+    const API_CIERRES = '../../php/api/cierres.php';
+    const API_APERTURAS = '../../php/api/aperturas.php';
+    const API_VENTAS_PASTELES = '../../php/api/ventas_pasteles.php';
+    const API_VENTAS_BEBIDAS = '../../php/api/ventas_bebidas.php';
+    const API_NEQUI = '../../php/api/nequi.php';
+    const API_PRODUCTOS = '../../php/api/productos.php';
 
-        // ==================== FUNCIONES PARA VER BEBIDAS VENDIDAS ====================
-function verBebidasVendidas(aperturaId, fechaCierre) {
-    console.log('🔍 Ver bebidas vendidas para apertura:', aperturaId);
-    
-    const modal = document.getElementById('modalBebidas');
-    const body = document.getElementById('modalBebidasBody');
-    const fechaDisplay = document.getElementById('modalBebidasFecha');
-    
-    // Mostrar fecha
-    if (fechaCierre) {
-        const fecha = new Date(fechaCierre);
-        fechaDisplay.textContent = `(${fecha.toLocaleDateString('es-CO')} ${fecha.toLocaleTimeString('es-CO')})`;
-    }
-    
-    // Obtener todas las ventas de bebidas
-    const ventasBebidas = DB.get('ventas_bebidas');
-    const productos = DB.get('productos');
-    const devoluciones = DB.get('devoluciones') || [];
-    
-    // Filtrar por apertura
-    const ventasDelTurno = ventasBebidas.filter(v => String(v.apertura_id) === String(aperturaId));
-    
-    if (ventasDelTurno.length === 0) {
-        body.innerHTML = `
-            <div class="sin-bebidas">
-                <span class="icono">🥤</span>
-                <p>No hay bebidas registradas en este turno</p>
-            </div>
-        `;
-        modal.classList.add('show');
-        modal.style.display = 'flex';
-        return;
-    }
-    
-    // Agrupar por producto
-    const productosMap = new Map();
-    let totalBebidas = 0;
-    let totalVentasBebidas = 0;
-    
-    ventasDelTurno.forEach(venta => {
-        const producto = productos.find(p => String(p.id) === String(venta.producto_id));
-        const nombreProducto = producto ? producto.nombre : 'Producto Desconocido';
-        const codigoProducto = producto ? producto.codigo : 'N/A';
-        const precio = producto ? producto.precio : 0;
-        
-        // Verificar devoluciones
-        const devuelto = devoluciones
-            .filter(d => String(d.ventaId) === String(venta.id) && !d.anulada)
-            .reduce((sum, d) => sum + (d.cantidad || 0), 0);
-        
-        const cantidadReal = (venta.cantidad || 1) - devuelto;
-        
-        if (cantidadReal <= 0) return;
-        
-        const key = String(venta.producto_id);
-        
-        if (!productosMap.has(key)) {
-            productosMap.set(key, {
-                id: venta.producto_id,
-                nombre: nombreProducto,
-                codigo: codigoProducto,
-                precio: precio,
-                cantidad: 0,
-                total: 0,
-                ventas: []
-            });
-        }
-        
-        const item = productosMap.get(key);
-        item.cantidad += cantidadReal;
-        item.total += cantidadReal * precio;
-        item.ventas.push({
-            id: venta.id,
-            cantidad: cantidadReal,
-            precio: precio,
-            fecha: venta.fecha,
-            subtotal: cantidadReal * precio
-        });
-        
-        totalBebidas += cantidadReal;
-        totalVentasBebidas += cantidadReal * precio;
-    });
-    
-    // Construir HTML
-    let html = `
-        <div class="resumen-bebidas">
-            <div class="item">
-                <div class="cantidad">${totalBebidas}</div>
-                <div class="label">Total Unidades</div>
-            </div>
-            <div class="item">
-                <div class="cantidad">$${totalVentasBebidas.toLocaleString('es-CO')}</div>
-                <div class="label">Total Ventas</div>
-            </div>
-            <div class="item">
-                <div class="cantidad">${productosMap.size}</div>
-                <div class="label">Productos Diferentes</div>
-            </div>
-        </div>
-        <div style="margin-top:10px;">
-    `;
-    
-    // Lista de productos
-    const productosOrdenados = Array.from(productosMap.values()).sort((a, b) => b.cantidad - a.cantidad);
-    
-    productosOrdenados.forEach(p => {
-        html += `
-            <div class="producto-bebida-item">
-                <div>
-                    <span class="nombre">${p.nombre}</span>
-                    <span class="codigo">(Cód: ${p.codigo})</span>
-                </div>
-                <div>
-                    <span class="cantidad">${p.cantidad} ud</span>
-                    <span class="total">$${p.total.toLocaleString('es-CO')}</span>
-                </div>
-            </div>
-        `;
-    });
-    
-    // Detalle de ventas individuales (últimas 10)
-    html += `
-        </div>
-        <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
-            <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">📋 Últimas ventas realizadas:</p>
-    `;
-    
-    // Obtener últimas ventas (máximo 10)
-    const ultimasVentas = ventasDelTurno
-        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-        .slice(0, 10);
-    
-    let ventasMostradas = 0;
-    ultimasVentas.forEach(venta => {
-        const producto = productos.find(p => String(p.id) === String(venta.producto_id));
-        const nombre = producto ? producto.nombre : 'Desconocido';
-        const precio = producto ? producto.precio : 0;
-        const fecha = new Date(venta.fecha);
-        const hora = fecha.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
-        
-        // Verificar devolución
-        const devuelto = devoluciones
-            .filter(d => String(d.ventaId) === String(venta.id) && !d.anulada)
-            .reduce((sum, d) => sum + (d.cantidad || 0), 0);
-        
-        const cantidadReal = (venta.cantidad || 1) - devuelto;
-        if (cantidadReal <= 0) return;
-        
-        ventasMostradas++;
-        html += `
-            <div class="bebida-card-item">
-                <div class="info">
-                    <span class="nombre">${nombre}</span>
-                    <span class="detalle">x${cantidadReal} - ${hora}</span>
-                </div>
-                <div class="monto">$${(cantidadReal * precio).toLocaleString('es-CO')}</div>
-            </div>
-        `;
-    });
-    
-    if (ventasMostradas === 0) {
-        html += `<div class="sin-bebidas"><p>No hay ventas activas</p></div>`;
-    }
-    
-    html += `</div>`;
-    
-    body.innerHTML = html;
-    
-    // Mostrar modal
-    modal.classList.add('show');
-    modal.style.display = 'flex';
-}
-
-// ==================== CERRAR MODAL DE BEBIDAS ====================
-function cerrarModalBebidas() {
-    const modal = document.getElementById('modalBebidas');
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-}
-
-// Cerrar modal de bebidas con ESC
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        cerrarModalBebidas();
-    }
-});
-
-// Cerrar modal de bebidas clickeando fuera
-document.getElementById('modalBebidas').addEventListener('click', function(e) {
-    if (e.target === this) {
-        cerrarModalBebidas();
-    }
-});
-    // ==================== ELIMINAR TODOS LOS CIERRES ====================
-    function eliminarTodosLosCierres() {
-        const cierres = DB.get('cierres_caja');
-        
-        if (cierres.length === 0) {
-            alert('📭 No hay registros de cierres para eliminar.');
-            return;
-        }
-        
-        const confirmar = confirm(
-            `⚠️ ¿ESTÁS SEGURO?\n\n` +
-            `Esta acción eliminará TODOS los ${cierres.length} registros de cierres.\n\n` +
-            `💰 Ventas totales: $${cierres.reduce((sum, c) => sum + (c.total_ventas_pasteles || 0) + (c.total_ventas_bebidas || 0), 0).toLocaleString('es-ES')}\n\n` +
-            `⚠️ Esta acción es IRREVERSIBLE.`
-        );
-        
-        if (!confirmar) return;
-        
-        const confirmar2 = confirm(
-            `🔴 CONFIRMACIÓN FINAL\n\n` +
-            `¿Estás 100% seguro de que deseas eliminar TODOS los registros?\n\n` +
-            `Esta acción no se puede deshacer.`
-        );
-        
-        if (!confirmar2) return;
-        
-        try {
-            // Eliminar todos los cierres
-            DB.set('cierres_caja', []);
-            
-            // IMPORTANTE: También eliminar el flag de datos inicializados
-            localStorage.removeItem('pos_datos_inicializados');
-            localStorage.removeItem('pos_cierres_inicializados');
-            
-            // También limpiar variables globales
-            cierresTotales = [];
-            cierresFiltrados = [];
-            indiceActual = 0;
-            
-            // Recargar la tabla
-            limpiarTabla();
-            document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">🗑️ Todos los registros han sido eliminados</td></tr>';
-            document.getElementById('btnVerMas').style.display = 'none';
-            
-            mostrarToast('✅ Todos los registros de cierres han sido eliminados correctamente', 'success');
-            console.log('🗑️ Todos los cierres eliminados');
-            
-        } catch (error) {
-            console.error('❌ Error al eliminar cierres:', error);
-            alert('❌ Error al eliminar los registros: ' + error.message);
-        }
-    }
-
-    // ==================== BASE DE DATOS LOCAL (localStorage) ====================
-    const DB = {
-        get: function(key) {
-            try {
-                const data = localStorage.getItem('pos_' + key);
-                return data ? JSON.parse(data) : [];
-            } catch (e) {
-                console.error('Error en DB.get:', e);
-                return [];
-            }
-        },
-        set: function(key, data) {
-            try {
-                localStorage.setItem('pos_' + key, JSON.stringify(data));
-                return true;
-            } catch (e) {
-                console.error('Error en DB.set:', e);
-                return false;
-            }
-        },
-        add: function(key, item) {
-            try {
-                const items = this.get(key);
-                item.id = Date.now() + Math.random() * 1000;
-                items.push(item);
-                this.set(key, items);
-                return item;
-            } catch (e) {
-                console.error('Error en DB.add:', e);
-                return null;
-            }
-        },
-        delete: function(key, id) {
-            try {
-                const items = this.get(key);
-                const filtered = items.filter(item => item.id != id);
-                this.set(key, filtered);
-                return true;
-            } catch (e) {
-                console.error('Error en DB.delete:', e);
-                return false;
-            }
-        },
-        find: function(key, field, value) {
-            try {
-                const items = this.get(key);
-                return items.filter(item => String(item[field]) === String(value));
-            } catch (e) {
-                console.error('Error en DB.find:', e);
-                return [];
-            }
-        }
-    };
-
+    // ==================== VARIABLES GLOBALES ====================
     let cierresTotales = [];
     let cierresFiltrados = [];
+    let aperturasCache = [];
+    let productosCache = [];
+    let ventasBebidasCache = [];
     let indiceActual = 0;
     const REGISTROS_POR_PAGINA = 5;
     let cargandoMas = false;
     let cierreAEliminar = null;
 
-    // ==================== FUNCIONES DE FECHA ====================
+    // ==================== FECHA ====================
     function actualizarFecha() {
         const hoy = new Date();
         const fechaElement = document.getElementById('fechaActual');
@@ -1161,28 +874,21 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
 
     function formatearFecha(fechaISO) {
         const fecha = new Date(fechaISO);
-        return fecha.toLocaleDateString('es-ES') + '<br>' + fecha.toLocaleTimeString('es-CO');
+        return fecha.toLocaleDateString('es-CO') + '<br>' + fecha.toLocaleTimeString('es-CO');
     }
 
     function formatearNumero(numero) {
         return (numero || 0).toLocaleString('es-CO');
     }
 
+    // ==================== TOAST ====================
     function mostrarToast(mensaje, tipo = 'info') {
         const toast = document.createElement('div');
         toast.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            border-radius: 10px;
-            color: white;
-            font-weight: 600;
-            z-index: 9999;
-            animation: slideIn 0.3s ease;
+            position: fixed; bottom: 20px; right: 20px; padding: 15px 25px;
+            border-radius: 10px; color: white; font-weight: 600; z-index: 9999;
             background: ${tipo === 'success' ? '#27ae60' : tipo === 'error' ? '#e74c3c' : '#3498db'};
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            max-width: 400px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-width: 400px;
         `;
         toast.innerHTML = mensaje;
         document.body.appendChild(toast);
@@ -1194,66 +900,127 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
         }, 4000);
     }
 
-    // ==================== FUNCIONES DE TABLA ====================
-    function limpiarTabla() {
-        const tbody = document.getElementById('cuerpoHistorial');
-        tbody.innerHTML = '';
+    // ==================== CARGAR DATOS DESDE SUPABASE ====================
+    async function cargarDatos() {
+        try {
+            console.log('📊 Cargando historial desde Supabase...');
+            
+            const [cierresRes, aperturasRes, productosRes, bebidasRes] = await Promise.all([
+                fetch(API_CIERRES),
+                fetch(API_APERTURAS),
+                fetch(API_PRODUCTOS),
+                fetch(API_VENTAS_BEBIDAS)
+            ]);
+            
+            const cierresData = await cierresRes.json();
+            const aperturasData = await aperturasRes.json();
+            const productosData = await productosRes.json();
+            const bebidasData = await bebidasRes.json();
+            
+            if (!cierresData.success) throw new Error(cierresData.error);
+            if (!aperturasData.success) throw new Error(aperturasData.error);
+            if (!productosData.success) throw new Error(productosData.error);
+            if (!bebidasData.success) throw new Error(bebidasData.error);
+            
+            aperturasCache = aperturasData.data || [];
+            productosCache = productosData.data || [];
+            ventasBebidasCache = bebidasData.data || [];
+            
+            // Combinar cierres con datos de apertura
+            cierresTotales = (cierresData.data || []).map(cierre => {
+                const apertura = aperturasCache.find(a => String(a.id) === String(cierre.apertura_id));
+                return {
+                    ...cierre,
+                    base_total: apertura?.base_total || 0,
+                    base_billetes: apertura?.base_billetes || 0,
+                    base_monedas: apertura?.base_monedas || 0,
+                    responsable_apertura: apertura?.responsable || 'No disponible'
+                };
+            });
+            
+            // Ordenar por fecha descendente
+            cierresTotales.sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
+            cierresFiltrados = [...cierresTotales];
+            
+            console.log(`✅ ${cierresTotales.length} cierres cargados`);
+            
+            if (cierresTotales.length === 0) {
+                document.getElementById('cuerpoHistorial').innerHTML = 
+                    '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">📭 No hay registros de cierres</td></tr>';
+                document.getElementById('btnVerMas').style.display = 'none';
+                return;
+            }
+            
+            reiniciarPaginacion();
+            
+        } catch (error) {
+            console.error('❌ Error:', error);
+            document.getElementById('cuerpoHistorial').innerHTML = 
+                `<tr><td colspan="8" style="text-align:center; color:#e74c3c; padding:30px;">❌ Error: ${error.message}</td></tr>`;
+        }
     }
 
- function agregarFilaTabla(cierre) {
-    const tbody = document.getElementById('cuerpoHistorial');
-    const fecha = new Date(cierre.fecha_cierre);
-    const fechaFormateada = fecha.toLocaleDateString('es-ES') + '<br>' + fecha.toLocaleTimeString('es-CO');
-    
-    if (cierre.modo === 'manana') {
+    // ==================== TABLA ====================
+    function limpiarTabla() {
+        document.getElementById('cuerpoHistorial').innerHTML = '';
+    }
+
+    function agregarFilaTabla(cierre) {
+        const tbody = document.getElementById('cuerpoHistorial');
+        const fecha = new Date(cierre.fecha_cierre);
+        const fechaFormateada = fecha.toLocaleDateString('es-CO') + '<br>' + fecha.toLocaleTimeString('es-CO');
+        
+        if (cierre.modo === 'manana') {
+            const totalVentasEfectivo = (cierre.total_ventas_pasteles || 0) + (cierre.total_ventas_bebidas || 0);
+            const fila = document.createElement('tr');
+            fila.style.background = '#e8f5e9';
+            fila.innerHTML = `
+                <td>${fechaFormateada}</td>
+                <td style="color:#27ae60;">🌅 Sin Base</td>
+                <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(totalVentasEfectivo)}</td>
+                <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.total_nequi)}</td>
+                <td style="color:#2c3e50; font-weight:600;">💰 Solo Ventas</td>
+                <td style="color:#2c3e50; font-weight:600;">-</td>
+                <td style="color:#27ae60; font-weight:700;">✅ Sin conteo</td>
+                <td>
+                    <div class="acciones-container">
+                        <button class="btn-accion btn-ver" onclick="verDetalle(${cierre.id})">👁️ Ver</button>
+                        <button class="btn-accion btn-bebidas" onclick="verBebidasVendidas(${cierre.apertura_id}, '${cierre.fecha_cierre}')">🥤 Bebidas</button>
+                        <button class="btn-accion btn-eliminar" onclick="confirmarEliminar(${cierre.id}, '${fecha.toLocaleDateString('es-CO')}')">🗑️ Eliminar</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(fila);
+            return;
+        }
+        
+        const diferenciaClase = cierre.diferencia >= 0 ? 'diferencia-positiva' : 'diferencia-negativa';
+        const diferenciaTexto = cierre.diferencia >= 0 
+            ? `+$${Math.abs(cierre.diferencia).toLocaleString('es-CO')}` 
+            : `-$${Math.abs(cierre.diferencia).toLocaleString('es-CO')}`;
         const totalVentasEfectivo = (cierre.total_ventas_pasteles || 0) + (cierre.total_ventas_bebidas || 0);
+        
         const fila = document.createElement('tr');
-        fila.style.background = '#e8f5e9';
         fila.innerHTML = `
             <td>${fechaFormateada}</td>
-            <td style="color:#27ae60;">🌅 Sin Base</td>
+            <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.base_total)}</td>
             <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(totalVentasEfectivo)}</td>
             <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.total_nequi)}</td>
-            <td style="color:#2c3e50; font-weight:600;">💰 Solo Ventas</td>
-            <td style="color:#2c3e50; font-weight:600;">-</td>
-            <td style="color:#27ae60; font-weight:700;">✅ Sin conteo</td>
+            <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.efectivo_esperado)}</td>
+            <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.efectivo_contado)}</td>
+            <td class="${diferenciaClase}" style="font-weight:700;">${diferenciaTexto}</td>
             <td>
                 <div class="acciones-container">
                     <button class="btn-accion btn-ver" onclick="verDetalle(${cierre.id})">👁️ Ver</button>
                     <button class="btn-accion btn-bebidas" onclick="verBebidasVendidas(${cierre.apertura_id}, '${cierre.fecha_cierre}')">🥤 Bebidas</button>
-                    <button class="btn-accion btn-eliminar" onclick="confirmarEliminar(${cierre.id}, '${fecha.toLocaleDateString('es-ES')}')">🗑️ Eliminar</button>
+                    <button class="btn-accion btn-eliminar" onclick="confirmarEliminar(${cierre.id}, '${fecha.toLocaleDateString('es-CO')}')">🗑️ Eliminar</button>
                 </div>
             </td>
         `;
         tbody.appendChild(fila);
-        return;
     }
-    
-    const diferenciaClase = cierre.diferencia >= 0 ? 'diferencia-positiva' : 'diferencia-negativa';
-    const diferenciaTexto = cierre.diferencia >= 0 ? `+$${Math.abs(cierre.diferencia).toLocaleString()}` : `-$${Math.abs(cierre.diferencia).toLocaleString()}`;
-    const totalVentasEfectivo = (cierre.total_ventas_pasteles || 0) + (cierre.total_ventas_bebidas || 0);
-    
-    const fila = document.createElement('tr');
-    fila.innerHTML = `
-        <td>${fechaFormateada}</td>
-        <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.base_total)}</td>
-        <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(totalVentasEfectivo)}</td>
-        <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.total_nequi)}</td>
-        <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.efectivo_esperado)}</td>
-        <td style="color:#2c3e50; font-weight:600;">$${formatearNumero(cierre.efectivo_contado)}</td>
-        <td class="${diferenciaClase}" style="font-weight:700;">${diferenciaTexto}</td>
-        <td>
-            <div class="acciones-container">
-                <button class="btn-accion btn-ver" onclick="verDetalle(${cierre.id})">👁️ Ver</button>
-                <button class="btn-accion btn-bebidas" onclick="verBebidasVendidas(${cierre.apertura_id}, '${cierre.fecha_cierre}')">🥤 Bebidas</button>
-                <button class="btn-accion btn-eliminar" onclick="confirmarEliminar(${cierre.id}, '${fecha.toLocaleDateString('es-ES')}')">🗑️ Eliminar</button>
-            </div>
-        </td>
-    `;
-    tbody.appendChild(fila);
-}
- 
 
+    // ==================== PAGINACIÓN ====================
     function cargarMasRegistros() {
         if (cargandoMas) return;
         cargandoMas = true;
@@ -1264,9 +1031,7 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
             return;
         }
         
-        if (indiceActual === 0) {
-            limpiarTabla();
-        }
+        if (indiceActual === 0) limpiarTabla();
         
         const siguienteLote = cierresFiltrados.slice(indiceActual, indiceActual + REGISTROS_POR_PAGINA);
         
@@ -1276,10 +1041,7 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
             return;
         }
         
-        siguienteLote.forEach(cierre => {
-            agregarFilaTabla(cierre);
-        });
-        
+        siguienteLote.forEach(cierre => agregarFilaTabla(cierre));
         indiceActual += siguienteLote.length;
         
         if (indiceActual < cierresFiltrados.length) {
@@ -1298,44 +1060,7 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
         cargarMasRegistros();
     }
 
-    function cargarHistorial() {
-        try {
-            console.log('📊 Cargando historial de cierres...');
-            
-            const cierres = DB.get('cierres_caja');
-            const aperturas = DB.get('aperturas_caja');
-            
-            console.log('Cierres encontrados:', cierres.length);
-            
-            if (!cierres || cierres.length === 0) {
-                document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">📭 No hay registros de cierres</td></tr>';
-                document.getElementById('btnVerMas').style.display = 'none';
-                return;
-            }
-            
-            cierresTotales = cierres.map(cierre => {
-                const apertura = aperturas.find(a => String(a.id) === String(cierre.apertura_id));
-                return {
-                    ...cierre,
-                    base_total: apertura ? apertura.base_total : 0,
-                    base_billetes: apertura ? apertura.base_billetes : 0,
-                    base_monedas: apertura ? apertura.base_monedas : 0,
-                    responsable_apertura: apertura ? apertura.responsable : 'No disponible'
-                };
-            });
-            
-            cierresTotales.sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre));
-            cierresFiltrados = [...cierresTotales];
-            
-            console.log('Registros totales:', cierresTotales.length);
-            reiniciarPaginacion();
-            
-        } catch (error) {
-            console.error('Error al cargar historial:', error);
-            document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8">Error al cargar los registros: ' + error.message + '</td></tr>';
-        }
-    }
-
+    // ==================== FILTROS ====================
     function filtrarHistorial() {
         const desde = document.getElementById('fechaDesde').value;
         const hasta = document.getElementById('fechaHasta').value;
@@ -1351,26 +1076,21 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
         if (desde) {
             const fechaDesde = new Date(desde);
             fechaDesde.setHours(0, 0, 0, 0);
-            filtrados = filtrados.filter(c => {
-                const fechaCierre = new Date(c.fecha_cierre);
-                return fechaCierre >= fechaDesde;
-            });
+            filtrados = filtrados.filter(c => new Date(c.fecha_cierre) >= fechaDesde);
         }
         
         if (hasta) {
             const fechaHasta = new Date(hasta);
             fechaHasta.setHours(23, 59, 59, 999);
-            filtrados = filtrados.filter(c => {
-                const fechaCierre = new Date(c.fecha_cierre);
-                return fechaCierre <= fechaHasta;
-            });
+            filtrados = filtrados.filter(c => new Date(c.fecha_cierre) <= fechaHasta);
         }
         
         cierresFiltrados = filtrados;
         
         if (cierresFiltrados.length === 0) {
             limpiarTabla();
-            document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">No hay registros en el rango de fechas seleccionado</td></tr>';
+            document.getElementById('cuerpoHistorial').innerHTML = 
+                '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">No hay registros en el rango seleccionado</td></tr>';
             document.getElementById('btnVerMas').style.display = 'none';
         } else {
             reiniciarPaginacion();
@@ -1384,7 +1104,8 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
         
         if (cierresFiltrados.length === 0) {
             limpiarTabla();
-            document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">No hay registros de cierres</td></tr>';
+            document.getElementById('cuerpoHistorial').innerHTML = 
+                '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">No hay registros de cierres</td></tr>';
             document.getElementById('btnVerMas').style.display = 'none';
         } else {
             reiniciarPaginacion();
@@ -1393,13 +1114,8 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
 
     // ==================== MODALES ====================
     function verDetalle(cierreId) {
-        const cierre = cierresFiltrados.find(c => c.id === cierreId);
+        const cierre = cierresTotales.find(c => String(c.id) === String(cierreId));
         if (!cierre) return;
-        
-        const ventasPasteles = DB.find('ventas_pasteles', 'apertura_id', cierre.apertura_id);
-        const ventasBebidas = DB.find('ventas_bebidas', 'apertura_id', cierre.apertura_id);
-        const transferencias = DB.find('transferencias_nequi', 'apertura_id', cierre.apertura_id);
-        const devoluciones = DB.get('devoluciones').filter(d => String(d.aperturaId) === String(cierre.apertura_id));
         
         let html = `
             <div class="detalle-item"><strong>📅 Fecha de cierre:</strong> ${new Date(cierre.fecha_cierre).toLocaleString('es-CO')}</div>
@@ -1429,8 +1145,156 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
         document.getElementById('modalDetalle').classList.remove('show');
     }
 
+    // ==================== MODAL BEBIDAS ====================
+    function verBebidasVendidas(aperturaId, fechaCierre) {
+        console.log('🔍 Ver bebidas para apertura:', aperturaId);
+        
+        const modal = document.getElementById('modalBebidas');
+        const body = document.getElementById('modalBebidasBody');
+        const fechaDisplay = document.getElementById('modalBebidasFecha');
+        
+        if (fechaCierre) {
+            const fecha = new Date(fechaCierre);
+            fechaDisplay.textContent = `(${fecha.toLocaleDateString('es-CO')} ${fecha.toLocaleTimeString('es-CO')})`;
+        }
+        
+        // Filtrar ventas de bebidas del turno
+        const ventasDelTurno = ventasBebidasCache.filter(v => String(v.apertura_id) === String(aperturaId));
+        
+        if (ventasDelTurno.length === 0) {
+            body.innerHTML = `
+                <div class="sin-bebidas">
+                    <span class="icono">🥤</span>
+                    <p>No hay bebidas registradas en este turno</p>
+                </div>
+            `;
+            modal.classList.add('show');
+            modal.style.display = 'flex';
+            return;
+        }
+        
+        // Agrupar por producto
+        const productosMap = new Map();
+        let totalBebidas = 0;
+        let totalVentasBebidas = 0;
+        
+        ventasDelTurno.forEach(venta => {
+            const producto = productosCache.find(p => String(p.id) === String(venta.producto_id));
+            const nombreProducto = producto ? producto.nombre : 'Producto Desconocido';
+            const codigoProducto = producto ? producto.codigo : 'N/A';
+            const precio = Number(venta.precio) || 0;
+            const cantidad = Number(venta.cantidad) || 1;
+            const subtotal = Number(venta.subtotal) || 0;
+            
+            const key = String(venta.producto_id);
+            
+            if (!productosMap.has(key)) {
+                productosMap.set(key, {
+                    id: venta.producto_id,
+                    nombre: nombreProducto,
+                    codigo: codigoProducto,
+                    precio: precio,
+                    cantidad: 0,
+                    total: 0,
+                    ventas: []
+                });
+            }
+            
+            const item = productosMap.get(key);
+            item.cantidad += cantidad;
+            item.total += subtotal;
+            item.ventas.push({
+                id: venta.id,
+                cantidad: cantidad,
+                precio: precio,
+                fecha: venta.fecha,
+                subtotal: subtotal
+            });
+            
+            totalBebidas += cantidad;
+            totalVentasBebidas += subtotal;
+        });
+        
+        let html = `
+            <div class="resumen-bebidas">
+                <div class="item">
+                    <div class="cantidad">${totalBebidas}</div>
+                    <div class="label">Total Unidades</div>
+                </div>
+                <div class="item">
+                    <div class="cantidad">$${totalVentasBebidas.toLocaleString('es-CO')}</div>
+                    <div class="label">Total Ventas</div>
+                </div>
+                <div class="item">
+                    <div class="cantidad">${productosMap.size}</div>
+                    <div class="label">Productos Diferentes</div>
+                </div>
+            </div>
+            <div style="margin-top:10px;">
+        `;
+        
+        const productosOrdenados = Array.from(productosMap.values()).sort((a, b) => b.cantidad - a.cantidad);
+        
+        productosOrdenados.forEach(p => {
+            html += `
+                <div class="producto-bebida-item">
+                    <div>
+                        <span class="nombre">${p.nombre}</span>
+                        <span class="codigo">(Cód: ${p.codigo})</span>
+                    </div>
+                    <div>
+                        <span class="cantidad">${p.cantidad} ud</span>
+                        <span class="total">$${p.total.toLocaleString('es-CO')}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+            </div>
+            <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+                <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">📋 Últimas ventas realizadas:</p>
+        `;
+        
+        const ultimasVentas = [...ventasDelTurno]
+            .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+            .slice(0, 10);
+        
+        ultimasVentas.forEach(venta => {
+            const producto = productosCache.find(p => String(p.id) === String(venta.producto_id));
+            const nombre = producto ? producto.nombre : 'Desconocido';
+            const precio = Number(venta.precio) || 0;
+            const cantidad = Number(venta.cantidad) || 1;
+            const fecha = new Date(venta.fecha);
+            const hora = fecha.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+            
+            html += `
+                <div class="bebida-card-item">
+                    <div class="info">
+                        <span class="nombre">${nombre}</span>
+                        <span class="detalle">x${cantidad} - ${hora}</span>
+                    </div>
+                    <div class="monto">$${(cantidad * precio).toLocaleString('es-CO')}</div>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+        body.innerHTML = html;
+        
+        modal.classList.add('show');
+        modal.style.display = 'flex';
+    }
+
+    function cerrarModalBebidas() {
+        const modal = document.getElementById('modalBebidas');
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+    }
+
+    // ==================== ELIMINAR CIERRE ====================
     function confirmarEliminar(cierreId, fechaFormato) {
-        cierreAEliminar = cierresFiltrados.find(c => c.id === cierreId);
+        cierreAEliminar = cierresTotales.find(c => String(c.id) === String(cierreId));
         if (!cierreAEliminar) return;
         
         document.getElementById('fechaEliminar').textContent = fechaFormato;
@@ -1444,31 +1308,79 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
         cierreAEliminar = null;
     }
 
-    function eliminarCierre() {
+    async function eliminarCierre() {
         if (!cierreAEliminar) return;
         
         try {
-            DB.delete('cierres_caja', cierreAEliminar.id);
-            cierresFiltrados = cierresFiltrados.filter(c => c.id !== cierreAEliminar.id);
-            cierresTotales = cierresTotales.filter(c => c.id !== cierreAEliminar.id);
+            const response = await fetch(`${API_CIERRES}?id=${cierreAEliminar.id}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+            
+            if (!result.success) throw new Error(result.error);
+            
+            cierresFiltrados = cierresFiltrados.filter(c => String(c.id) !== String(cierreAEliminar.id));
+            cierresTotales = cierresTotales.filter(c => String(c.id) !== String(cierreAEliminar.id));
             
             cerrarModalEliminar();
             
             if (cierresFiltrados.length === 0) {
                 limpiarTabla();
-                document.getElementById('cuerpoHistorial').innerHTML = '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">No hay registros de cierres</td></tr>';
+                document.getElementById('cuerpoHistorial').innerHTML = 
+                    '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">No hay registros de cierres</td></tr>';
                 document.getElementById('btnVerMas').style.display = 'none';
             } else {
                 reiniciarPaginacion();
             }
             
-            alert('✅ Reporte de caja eliminado correctamente');
+            mostrarToast('✅ Reporte eliminado', 'success');
         } catch (error) {
-            console.error('Error al eliminar cierre:', error);
-            alert('❌ Error al eliminar el reporte: ' + error.message);
+            console.error('Error:', error);
+            alert('❌ Error: ' + error.message);
         }
     }
 
+    // ==================== ELIMINAR TODOS ====================
+    async function eliminarTodosLosCierres() {
+        if (cierresTotales.length === 0) {
+            alert('📭 No hay registros para eliminar.');
+            return;
+        }
+        
+        const confirmar = confirm(
+            `⚠️ ¿ESTÁS SEGURO?\n\n` +
+            `Esta acción eliminará TODOS los ${cierresTotales.length} registros de cierres.\n\n` +
+            `⚠️ Esta acción es IRREVERSIBLE.`
+        );
+        
+        if (!confirmar) return;
+        
+        const confirmar2 = confirm(`🔴 CONFIRMACIÓN FINAL\n\n¿Estás 100% seguro?`);
+        if (!confirmar2) return;
+        
+        try {
+            // Eliminar todos los cierres
+            for (const cierre of cierresTotales) {
+                await fetch(`${API_CIERRES}?id=${cierre.id}`, { method: 'DELETE' });
+            }
+            
+            cierresTotales = [];
+            cierresFiltrados = [];
+            indiceActual = 0;
+            
+            limpiarTabla();
+            document.getElementById('cuerpoHistorial').innerHTML = 
+                '<tr><td colspan="8" style="text-align:center; color:#666; padding:30px;">🗑️ Todos los registros han sido eliminados</td></tr>';
+            document.getElementById('btnVerMas').style.display = 'none';
+            
+            mostrarToast('✅ Todos los registros eliminados', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error: ' + error.message);
+        }
+    }
+
+    // ==================== EXPORTAR ====================
     function exportarReporte() {
         if (cierresFiltrados.length === 0) {
             alert('No hay datos para exportar');
@@ -1480,8 +1392,8 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
             const fecha = new Date(cierre.fecha_cierre);
             const totalVentasEfectivo = (cierre.total_ventas_pasteles || 0) + (cierre.total_ventas_bebidas || 0);
             return [
-                fecha.toLocaleDateString('es-ES'),
-                fecha.toLocaleTimeString('es-ES'),
+                fecha.toLocaleDateString('es-CO'),
+                fecha.toLocaleTimeString('es-CO'),
                 cierre.responsable || 'No especificado',
                 cierre.base_total || 0,
                 totalVentasEfectivo,
@@ -1493,10 +1405,8 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
             ];
         });
         
-        let csvContent = cabeceras.join(',') + '\n' + '\uFEFF';
-        filas.forEach(fila => {
-            csvContent += fila.join(',') + '\n';
-        });
+        let csvContent = cabeceras.join(',') + '\n\uFEFF';
+        filas.forEach(fila => { csvContent += fila.join(',') + '\n'; });
         
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
@@ -1512,12 +1422,13 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
     }
 
     // ==================== INICIALIZACIÓN ====================
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('🔧 Inicializando página de historial...');
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log('🔧 Inicializando historial...');
         actualizarFecha();
-        cargarHistorial();
+        await cargarDatos();
         
-        document.getElementById('btnVerMas').addEventListener('click', cargarMasRegistros);
+        const btnVerMas = document.getElementById('btnVerMas');
+        if (btnVerMas) btnVerMas.addEventListener('click', cargarMasRegistros);
         
         document.getElementById('modalDetalle').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalDetalle();
@@ -1525,23 +1436,36 @@ document.getElementById('modalBebidas').addEventListener('click', function(e) {
         document.getElementById('modalEliminar').addEventListener('click', function(e) {
             if (e.target === this) cerrarModalEliminar();
         });
+        document.getElementById('modalBebidas').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModalBebidas();
+        });
         
-        console.log('✅ Página de historial inicializada');
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                cerrarModalDetalle();
+                cerrarModalEliminar();
+                cerrarModalBebidas();
+            }
+        });
+        
+        console.log('✅ Historial inicializado');
     });
 
-    window.cargarHistorial = cargarHistorial;
-    window.filtrarHistorial = filtrarHistorial;
-    window.limpiarFiltros = limpiarFiltros;
-    window.exportarReporte = exportarReporte;
+    // ==================== EXPONER FUNCIONES ====================
     window.verDetalle = verDetalle;
     window.cerrarModalDetalle = cerrarModalDetalle;
+    window.verBebidasVendidas = verBebidasVendidas;
+    window.cerrarModalBebidas = cerrarModalBebidas;
     window.confirmarEliminar = confirmarEliminar;
     window.cerrarModalEliminar = cerrarModalEliminar;
     window.eliminarCierre = eliminarCierre;
-    window.cargarMasRegistros = cargarMasRegistros;
     window.eliminarTodosLosCierres = eliminarTodosLosCierres;
-    window.DB = DB;
+    window.filtrarHistorial = filtrarHistorial;
+    window.limpiarFiltros = limpiarFiltros;
+    window.exportarReporte = exportarReporte;
+    window.cargarMasRegistros = cargarMasRegistros;
 </script>
+
 
 </body>
 </html>

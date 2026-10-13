@@ -191,89 +191,35 @@
             </form>
         </div>
     </div>
-    
     <script>
-    // ==================== OBJETO DB LOCAL ====================
-    const DB = {
-        get: function(key) {
-            try {
-                const data = localStorage.getItem('pos_' + key);
-                return data ? JSON.parse(data) : [];
-            } catch (e) {
-                console.error('Error en DB.get:', e);
-                return [];
-            }
-        },
-        set: function(key, data) {
-            try {
-                localStorage.setItem('pos_' + key, JSON.stringify(data));
-                return true;
-            } catch (e) {
-                console.error('Error en DB.set:', e);
-                return false;
-            }
-        },
-        add: function(key, item) {
-            try {
-                const items = this.get(key);
-                item.id = Date.now() + Math.random() * 1000;
-                items.push(item);
-                this.set(key, items);
-                return item;
-            } catch (e) {
-                console.error('Error en DB.add:', e);
-                return null;
-            }
-        },
-        update: function(key, id, data) {
-            try {
-                const items = this.get(key);
-                const index = items.findIndex(item => item.id == id);
-                if (index === -1) return false;
-                Object.assign(items[index], data);
-                this.set(key, items);
-                return true;
-            } catch (e) {
-                console.error('Error en DB.update:', e);
-                return false;
-            }
-        },
-        delete: function(key, id) {
-            try {
-                const items = this.get(key);
-                const filtered = items.filter(item => item.id != id);
-                this.set(key, filtered);
-                return true;
-            } catch (e) {
-                console.error('Error en DB.delete:', e);
-                return false;
-            }
-        }
-    };
+    // ============================================================
+    // API DE APERTURAS (conexión con Supabase)
+    // ============================================================
+    const API_APERTURAS = '../../php/api/aperturas.php';
 
     // ==================== VARIABLES GLOBALES ====================
     let modoSeleccionado = 'manana';
     let aperturaActiva = null;
 
-    // ==================== FUNCIÓN PARA OBTENER APERTURA ACTUAL ====================
-    function getAperturaActual() {
+    // ==================== FECHA ====================
+    function actualizarFecha() {
+        const hoy = new Date();
+        const el = document.getElementById('fechaDisplay');
+        if (el) {
+            el.innerHTML = hoy.toLocaleDateString('es-CO', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+    }
+
+    // ==================== OBTENER APERTURA ACTIVA (SUPABASE) ====================
+    async function obtenerAperturaActiva() {
         try {
-            // 1. Intentar con el ID guardado
-            const aperturaId = localStorage.getItem('pos_apertura_actual_id');
-            if (aperturaId) {
-                const aperturas = DB.get('aperturas_caja');
-                const apertura = aperturas.find(a => parseInt(a.id) === parseInt(aperturaId) && a.estado === 'abierta');
-                if (apertura) return apertura;
+            const response = await fetch(`${API_APERTURAS}?estado=abierta`);
+            const result = await response.json();
+            if (result.success && result.data && result.data.length > 0) {
+                return result.data[0];
             }
-            
-            // 2. Buscar cualquier apertura abierta
-            const aperturas = DB.get('aperturas_caja');
-            const aperturaAbierta = aperturas.find(a => a.estado === 'abierta');
-            if (aperturaAbierta) {
-                localStorage.setItem('pos_apertura_actual_id', aperturaAbierta.id);
-                return aperturaAbierta;
-            }
-            
             return null;
         } catch (e) {
             console.error('Error al obtener apertura:', e);
@@ -281,28 +227,16 @@
         }
     }
 
-    // ==================== FUNCIONES DE UI ====================
-    
-    // Mostrar fecha
-    document.addEventListener('DOMContentLoaded', function() {
-        const hoy = new Date();
-        document.getElementById('fechaDisplay').innerHTML = hoy.toLocaleDateString('es-CO', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-        });
-        
-        // Verificar turno activo al cargar
-        verificarTurnoActivo();
-    });
-    
-    function verificarTurnoActivo() {
-        const turno = getAperturaActual();
+    // ==================== VERIFICAR TURNO ACTIVO ====================
+    async function verificarTurnoActivo() {
+        const turno = await obtenerAperturaActiva();
         const turnoDiv = document.getElementById('turnoActivo');
         const infoDiv = document.getElementById('turnoActivoInfo');
         
         if (turno) {
             aperturaActiva = turno;
             turnoDiv.style.display = 'block';
-            const fecha = new Date(turno.fecha);
+            const fecha = new Date(turno.fecha_apertura || turno.fecha);
             infoDiv.innerHTML = `
                 👤 Responsable: ${turno.responsable || 'No especificado'}<br>
                 📋 Modo: ${turno.modo === 'manana' ? '🌅 Turno 1' : '🌙 Turno 2'}<br>
@@ -310,7 +244,6 @@
                 ${turno.modo === 'tarde' ? `💰 Base: $${(turno.base_total || 0).toLocaleString('es-CO')}` : ''}
             `;
             
-            // Deshabilitar el formulario
             document.getElementById('formApertura').style.opacity = '0.5';
             document.getElementById('formApertura').style.pointerEvents = 'none';
             document.getElementById('btnIniciarTurno').disabled = true;
@@ -323,7 +256,8 @@
             document.getElementById('btnIniciarTurno').disabled = false;
         }
     }
-    
+
+    // ==================== MOSTRAR MENSAJE ====================
     function mostrarMensaje(texto, tipo = 'info') {
         const container = document.getElementById('mensajeError');
         if (!container) return;
@@ -345,7 +279,8 @@
             container.style.display = 'none';
         }, 5000);
     }
-    
+
+    // ==================== SELECCIONAR MODO ====================
     function seleccionarModo(modo) {
         modoSeleccionado = modo;
         
@@ -374,25 +309,18 @@
         
         sessionStorage.setItem('modoTurno', modo);
     }
-    
+
+    // ==================== FORMATEO ====================
     function formatearNumero(input) {
         let valor = input.value.replace(/[^0-9]/g, '');
-        if (valor === '') {
-            input.value = '';
-            return;
-        }
-        let numero = parseInt(valor, 10);
-        input.value = numero.toLocaleString('es-CO');
+        if (valor === '') { input.value = ''; return; }
+        input.value = parseInt(valor, 10).toLocaleString('es-CO');
     }
     
     function formatearNumeroCompleto(input) {
         let valor = input.value.replace(/[^0-9]/g, '');
-        if (valor === '') {
-            input.value = '';
-            return;
-        }
-        let numero = parseInt(valor, 10);
-        input.value = numero.toLocaleString('es-CO');
+        if (valor === '') { input.value = ''; return; }
+        input.value = parseInt(valor, 10).toLocaleString('es-CO');
     }
     
     function obtenerValorNumerico(inputId) {
@@ -402,17 +330,15 @@
         return valor === '' ? 0 : parseInt(valor, 10);
     }
 
-    // ==================== FUNCIÓN PRINCIPAL DE APERTURA ====================
-    
-    function registrarApertura() {
+    // ==================== REGISTRAR APERTURA (SUPABASE) ====================
+    async function registrarApertura() {
         console.log('🔄 Iniciando registro de apertura...');
         
         // 1. Verificar si ya hay un turno activo
-        const turnoExistente = getAperturaActual();
+        const turnoExistente = await obtenerAperturaActiva();
         if (turnoExistente) {
             alert('❌ Ya existe un turno abierto.\n\n' +
-                  '👤 Responsable: ' + (turnoExistente.responsable || 'No especificado') + '\n' +
-                  '📅 Fecha: ' + new Date(turnoExistente.fecha).toLocaleString() + '\n\n' +
+                  '👤 Responsable: ' + (turnoExistente.responsable || 'No especificado') + '\n\n' +
                   'Debes cerrar el turno actual antes de iniciar uno nuevo.');
             return;
         }
@@ -441,7 +367,7 @@
         
         const observaciones = document.getElementById('observaciones').value || 'Sin observaciones';
         
-        // 4. Confirmar apertura
+        // 4. Confirmar
         const confirmar = confirm(`✅ Confirmar apertura:\n\n` +
             `📋 Modo: ${modoSeleccionado === 'manana' ? '🌅 TURNO 1 (Dueño)' : '🌙 TURNO 2 (Empleada)'}\n` +
             `👤 Responsable: ${nombre}\n` +
@@ -457,58 +383,61 @@
         btnIniciar.innerHTML = '⏳ Procesando...';
         
         try {
-            // 6. Crear la apertura
-            const nuevaApertura = {
-                id: Date.now(),
-                modo: modoSeleccionado,
-                responsable: nombre,
-                base_billetes: billetes,
-                base_monedas: monedas,
-                base_total: baseTotal,
-                fecha: new Date().toISOString(),
-                observaciones: observaciones,
-                estado: 'abierta',
-                fecha_apertura: new Date().toISOString()
-            };
+            // 6. Crear la apertura en Supabase
+            const response = await fetch(API_APERTURAS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    modo: modoSeleccionado,
+                    responsable: nombre,
+                    base_billetes: billetes,
+                    base_monedas: monedas,
+                    base_total: baseTotal,
+                    observaciones: observaciones,
+                    estado: 'abierta',
+                    fecha_apertura: new Date().toISOString()
+                })
+            });
             
-            console.log('📝 Guardando apertura:', nuevaApertura);
+            const result = await response.json();
             
-            // 7. Guardar en localStorage usando DB
-            const aperturas = DB.get('aperturas_caja');
-            aperturas.push(nuevaApertura);
-            DB.set('aperturas_caja', aperturas);
+            if (!result.success) {
+                throw new Error(result.error || 'Error al crear la apertura');
+            }
             
-            // 8. Guardar ID de apertura actual
-            localStorage.setItem('pos_apertura_actual_id', nuevaApertura.id);
-            sessionStorage.setItem('aperturaActual', JSON.stringify(nuevaApertura));
+            console.log('✅ Apertura creada:', result.data);
             
-            console.log('✅ Apertura guardada exitosamente');
-            
-            // 9. Mostrar mensaje de éxito
             alert(`✅ ¡Apertura registrada con éxito!\n\n` +
                   `📋 Modo: ${modoSeleccionado === 'manana' ? 'TURNO 1' : 'TURNO 2'}\n` +
                   `👤 Responsable: ${nombre}\n` +
-                  `📝 ID de apertura: ${nuevaApertura.id}\n\n` +
-                  `Redirigiendo a la página de ventas...`);
+                  `📝 ID: ${result.data?.id || 'N/A'}\n\n` +
+                  `Redirigiendo a Ventas...`);
             
-            // 10. Redirigir a ventas
+            // Redirigir
             window.location.href = 'ventas.html';
             
         } catch (error) {
-            console.error('❌ Error al guardar apertura:', error);
+            console.error('❌ Error:', error);
             alert('❌ Error al registrar la apertura: ' + error.message);
-            
-            // Restaurar botón
             btnIniciar.disabled = false;
             btnIniciar.innerHTML = '✅ Iniciar turno';
         }
     }
 
     // ==================== INICIALIZACIÓN ====================
-    
-    // Inicializar modo por defecto
-    const modoGuardado = sessionStorage.getItem('modoTurno') || 'manana';
-    seleccionarModo(modoGuardado);
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log('🔧 Inicializando apertura de caja...');
+        actualizarFecha();
+        
+        // Inicializar modo por defecto
+        const modoGuardado = sessionStorage.getItem('modoTurno') || 'manana';
+        seleccionarModo(modoGuardado);
+        
+        // Verificar turno activo
+        await verificarTurnoActivo();
+        
+        console.log('✅ Apertura inicializada');
+    });
 
     // Permitir Enter en el formulario
     document.getElementById('formApertura').addEventListener('keypress', function(e) {
@@ -523,21 +452,8 @@
     window.registrarApertura = registrarApertura;
     window.formatearNumero = formatearNumero;
     window.formatearNumeroCompleto = formatearNumeroCompleto;
-    window.getAperturaActual = getAperturaActual;
-    window.DB = DB;
+    window.obtenerAperturaActiva = obtenerAperturaActiva;
+</script>
 
-    console.log('📋 Sistema de apertura de caja inicializado correctamente');
-    console.log('💡 Modo actual:', modoSeleccionado);
-    console.log('🔍 Verificando turno activo...');
-    
-    // Verificar turno activo al cargar
-    const turno = getAperturaActual();
-    if (turno) {
-        console.log('⚠️ Turno activo encontrado:', turno);
-        verificarTurnoActivo();
-    } else {
-        console.log('✅ No hay turno activo');
-    }
-    </script>
 </body>
 </html>

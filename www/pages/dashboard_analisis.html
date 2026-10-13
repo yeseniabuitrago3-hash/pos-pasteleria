@@ -238,63 +238,76 @@
 
 <script src="../js/database.js"></script>
 <script>
+    // ============================================================
+    // API UNIFICADA DEL DASHBOARD
+    // ============================================================
+    const API_DASHBOARD = '../../php/api/dashboard.php';
+
     // ==================== VARIABLES GLOBALES ====================
     let chartVentas;
+    let datosCache = {
+        ventasPasteles: [],
+        ventasBebidas: [],
+        nequi: [],
+        productos: [],
+        aperturas: []
+    };
 
-    // ==================== ACTUALIZAR FECHA ====================
+    // ==================== FECHA ====================
     function actualizarFecha() {
         const hoy = new Date();
         const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         const fechaSpan = document.getElementById('fechaActual');
-        if (fechaSpan) fechaSpan.textContent = hoy.toLocaleDateString('es-ES', opciones);
+        if (fechaSpan) fechaSpan.textContent = hoy.toLocaleDateString('es-CO', opciones);
     }
 
-    // ==================== ELIMINAR TODOS LOS CIERRES ====================
-    function eliminarTodosLosCierres() {
-        const cierresData = localStorage.getItem('pos_cierres_caja');
-        const cierres = cierresData ? JSON.parse(cierresData) : [];
-        if (cierres.length === 0) {
-            alert('📭 No hay registros de cierres para eliminar.');
-            return;
-        }
-        const confirmar = confirm(`⚠️ ¿ESTÁS SEGURO?\n\nEsta acción eliminará TODOS los ${cierres.length} registros de cierres.\n\n💰 Ventas totales: $${cierres.reduce((sum, c) => sum + (c.total_ventas_pasteles || 0) + (c.total_ventas_bebidas || 0), 0).toLocaleString('es-ES')}\n\n⚠️ Esta acción es IRREVERSIBLE.`);
-        if (!confirmar) return;
-        const confirmar2 = confirm(`🔴 CONFIRMACIÓN FINAL\n\n¿Estás 100% seguro de que deseas eliminar TODOS los registros?\n\nEsta acción no se puede deshacer.`);
-        if (!confirmar2) return;
+    // ==================== CARGAR DATOS DESDE SUPABASE ====================
+    async function cargarDatos() {
         try {
-            localStorage.setItem('pos_cierres_caja', JSON.stringify([]));
-            actualizarDashboard();
-            alert('✅ Todos los registros de cierres han sido eliminados correctamente.');
-        } catch (error) {
-            console.error('❌ Error al eliminar cierres:', error);
-            alert('❌ Error al eliminar los registros: ' + error.message);
-        }
-    }
-    window.eliminarTodosLosCierres = eliminarTodosLosCierres;
-
-    // ==================== ACTUALIZAR ESTADO DE TURNO ====================
-    function actualizarEstadoTurno() {
-        try {
-            const aperturaId = localStorage.getItem('pos_apertura_actual_id');
-            let apertura = null;
-            if (aperturaId) {
-                const aperturasData = localStorage.getItem('pos_aperturas_caja');
-                const aperturas = aperturasData ? JSON.parse(aperturasData) : [];
-                apertura = aperturas.find(a => String(a.id) === String(aperturaId) && a.estado === 'abierta');
+            const response = await fetch(API_DASHBOARD);
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error);
             }
-            const estadoSpan = document.getElementById('estadoTurno');
-            const baseSpan = document.getElementById('baseInfo');
-            if (apertura) {
-                estadoSpan.className = 'estado-abierto';
-                estadoSpan.innerHTML = '🟢 Turno abierto';
-                if(baseSpan) baseSpan.innerHTML = `Base: $${(apertura.base_total || 0).toLocaleString('es-ES')}`;
-            } else {
-                estadoSpan.className = 'estado-cerrado';
-                estadoSpan.innerHTML = '🔴 Turno cerrado';
-                if(baseSpan) baseSpan.innerHTML = '';
-            }
+            
+            datosCache.ventasPasteles = result.data.ventas_pasteles || [];
+            datosCache.ventasBebidas = result.data.ventas_bebidas || [];
+            datosCache.nequi = result.data.nequi || [];
+            datosCache.productos = result.data.productos || [];
+            datosCache.aperturas = result.data.aperturas || [];
+            
+            console.log('✅ Datos cargados:', {
+                pasteles: datosCache.ventasPasteles.length,
+                bebidas: datosCache.ventasBebidas.length,
+                nequi: datosCache.nequi.length,
+                productos: datosCache.productos.length,
+                aperturas: datosCache.aperturas.length
+            });
+            
+            return true;
         } catch (e) {
-            console.error('Error al actualizar estado del turno:', e);
+            console.error('❌ Error al cargar datos:', e);
+            return false;
+        }
+    }
+
+    // ==================== ESTADO DEL TURNO ====================
+    function actualizarEstadoTurno() {
+        const aperturaAbierta = datosCache.aperturas.find(a => a.estado === 'abierta');
+        const estadoSpan = document.getElementById('estadoTurno');
+        const baseSpan = document.getElementById('baseInfo');
+        
+        if (aperturaAbierta) {
+            estadoSpan.className = 'estado-abierto';
+            estadoSpan.innerHTML = '🟢 Turno abierto';
+            if (baseSpan) {
+                baseSpan.innerHTML = `Base: $${(aperturaAbierta.base_total || 0).toLocaleString('es-CO')}`;
+            }
+        } else {
+            estadoSpan.className = 'estado-cerrado';
+            estadoSpan.innerHTML = '🔴 Turno cerrado';
+            if (baseSpan) baseSpan.innerHTML = '';
         }
     }
 
@@ -303,7 +316,7 @@
         if (!fechaString) return '-';
         try {
             const fecha = new Date(fechaString);
-            return fecha.toLocaleDateString('es-ES', { 
+            return fecha.toLocaleDateString('es-CO', { 
                 weekday: 'long', 
                 year: 'numeric', 
                 month: 'long', 
@@ -314,217 +327,193 @@
         }
     }
 
-    // ==================== OBTENER FECHAS SEGÚN PERÍODO ====================
+    // ==================== OBTENER FECHAS DEL PERÍODO ====================
     function obtenerFechasPeriodo() {
         const hoy = new Date();
         let fechaInicio, fechaFin;
         const periodo = document.getElementById('periodoSelect').value;
-        const ahora = new Date(hoy);
         
         switch(periodo) {
             case 'diario':
-                fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
-                fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
+                fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0, 0);
+                fechaFin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59, 999);
                 break;
             case 'semanal':
-                fechaInicio = new Date(ahora);
-                fechaInicio.setDate(ahora.getDate() - 6);
+                fechaInicio = new Date(hoy);
+                fechaInicio.setDate(hoy.getDate() - 6);
                 fechaInicio.setHours(0, 0, 0, 0);
-                fechaFin = new Date(ahora);
+                fechaFin = new Date(hoy);
                 fechaFin.setHours(23, 59, 59, 999);
                 break;
             case 'mensual':
-                fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1, 0, 0, 0, 0);
-                fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59, 999);
+                fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0);
+                fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999);
                 break;
             case 'anual':
-                fechaInicio = new Date(ahora.getFullYear(), 0, 1, 0, 0, 0, 0);
-                fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59, 999);
+                fechaInicio = new Date(hoy.getFullYear(), 0, 1, 0, 0, 0, 0);
+                fechaFin = new Date(hoy.getFullYear(), 11, 31, 23, 59, 59, 999);
                 break;
             case 'personalizado':
                 const desde = document.getElementById('fechaDesdePersonal').value;
                 const hasta = document.getElementById('fechaHastaPersonal').value;
-                if(desde && hasta) {
+                if (desde && hasta) {
                     const d = new Date(desde);
                     const h = new Date(hasta);
                     fechaInicio = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
                     fechaFin = new Date(h.getFullYear(), h.getMonth(), h.getDate(), 23, 59, 59, 999);
                 } else {
-                    fechaInicio = new Date(ahora);
-                    fechaInicio.setDate(ahora.getDate() - 7);
+                    fechaInicio = new Date(hoy);
+                    fechaInicio.setDate(hoy.getDate() - 7);
                     fechaInicio.setHours(0, 0, 0, 0);
-                    fechaFin = new Date(ahora);
+                    fechaFin = new Date(hoy);
                     fechaFin.setHours(23, 59, 59, 999);
                 }
                 break;
             default:
-                fechaInicio = new Date(ahora);
-                fechaInicio.setDate(ahora.getDate() - 7);
+                fechaInicio = new Date(hoy);
+                fechaInicio.setDate(hoy.getDate() - 7);
                 fechaInicio.setHours(0, 0, 0, 0);
-                fechaFin = new Date(ahora);
+                fechaFin = new Date(hoy);
                 fechaFin.setHours(23, 59, 59, 999);
         }
         return { fechaInicio, fechaFin };
     }
 
-    // ==================== OBTENER DATOS DE LOCALSTORAGE ====================
-    function obtenerDatosLocalStorage() {
-        try {
-            const cierres = JSON.parse(localStorage.getItem('pos_cierres_caja') || '[]');
-            const ventasPasteles = JSON.parse(localStorage.getItem('pos_ventas_pasteles') || '[]');
-            const ventasBebidas = JSON.parse(localStorage.getItem('pos_ventas_bebidas') || '[]');
-            const transferencias = JSON.parse(localStorage.getItem('pos_transferencias_nequi') || '[]');
-            const devoluciones = JSON.parse(localStorage.getItem('pos_devoluciones') || '[]');
-            const aperturas = JSON.parse(localStorage.getItem('pos_aperturas_caja') || '[]');
-            const productos = JSON.parse(localStorage.getItem('pos_productos') || '[]');
-            return { cierres, ventasPasteles, ventasBebidas, transferencias, devoluciones, aperturas, productos };
-        } catch (e) {
-            console.error('Error al obtener datos de localStorage:', e);
-            return { cierres: [], ventasPasteles: [], ventasBebidas: [], transferencias: [], devoluciones: [], aperturas: [], productos: [] };
-        }
-    }
-
-    // ==================== OBTENER VENTAS POR APERTURA ====================
-    function obtenerVentasPorApertura(aperturaId, datos) {
-        const { ventasPasteles, ventasBebidas, transferencias, devoluciones } = datos;
-        const aperturaIdStr = String(aperturaId);
-        const ventasPastelesFiltradas = ventasPasteles.filter(v => String(v.apertura_id) === aperturaIdStr);
-        const ventasBebidasFiltradas = ventasBebidas.filter(v => String(v.apertura_id) === aperturaIdStr);
-        const transferenciasFiltradas = transferencias.filter(t => String(t.apertura_id) === aperturaIdStr);
-        const devolucionesFiltradas = devoluciones.filter(d => String(d.aperturaId) === aperturaIdStr || String(d.apertura_id) === aperturaIdStr);
+    // ==================== ESTADÍSTICAS DEL PERÍODO ====================
+    function calcularEstadisticas(fechaInicio, fechaFin) {
+        const { ventasPasteles, ventasBebidas, nequi, aperturas } = datosCache;
         
+        // Filtrar por fecha
+        const enRango = (fechaStr) => {
+            if (!fechaStr) return false;
+            const fecha = new Date(fechaStr);
+            return fecha >= fechaInicio && fecha <= fechaFin;
+        };
+        
+        const pastelesRango = ventasPasteles.filter(v => enRango(v.fecha));
+        const bebidasRango = ventasBebidas.filter(v => enRango(v.fecha));
+        const nequiRango = nequi.filter(n => enRango(n.fecha));
+        const aperturasRango = aperturas.filter(a => enRango(a.fecha_apertura));
+        
+        // Calcular totales
         let totalPasteles = 0;
         let cantidadPasteles = 0;
-        ventasPastelesFiltradas.forEach(v => {
-            const devuelto = devolucionesFiltradas.filter(d => String(d.ventaId) === String(v.id) && !d.anulada).reduce((sum, d) => sum + (d.cantidad || 0), 0);
-            const cantidadVendida = (v.cantidad || 0) - devuelto;
-            cantidadPasteles += cantidadVendida;
-            totalPasteles += cantidadVendida * (v.precio_unitario || 2000);
+        pastelesRango.forEach(v => {
+            cantidadPasteles += Number(v.cantidad) || 0;
+            totalPasteles += Number(v.subtotal) || 0;
         });
+        
         let totalBebidas = 0;
         let cantidadBebidas = 0;
-        ventasBebidasFiltradas.forEach(v => {
-            const devuelto = devolucionesFiltradas.filter(d => String(d.ventaId) === String(v.id) && !d.anulada).reduce((sum, d) => sum + (d.cantidad || 0), 0);
-            const cantidadVendida = (v.cantidad || 1) - devuelto;
-            cantidadBebidas += cantidadVendida;
-            totalBebidas += cantidadVendida * (v.precio || 0);
+        bebidasRango.forEach(v => {
+            cantidadBebidas += Number(v.cantidad) || 0;
+            totalBebidas += Number(v.subtotal) || 0;
         });
-        const totalNequi = transferenciasFiltradas.reduce((sum, t) => sum + (t.monto || 0), 0);
-        const totalEfectivo = totalPasteles + totalBebidas;
+        
+        const totalNequi = nequiRango.reduce((sum, n) => sum + Number(n.monto || 0), 0);
+        const totalVentas = totalPasteles + totalBebidas;
+        const totalCierres = aperturasRango.filter(a => a.estado === 'cerrada').length;
+        
+        // Calcular mejor día y ventas por día
+        const ventasPorDia = new Map();
+        [...pastelesRango, ...bebidasRango].forEach(v => {
+            if (!v.fecha) return;
+            const fechaKey = v.fecha.split('T')[0];
+            const monto = Number(v.subtotal) || 0;
+            ventasPorDia.set(fechaKey, (ventasPorDia.get(fechaKey) || 0) + monto);
+        });
+        
+        let mejorDia = { fecha: null, total: 0 };
+        for (const [fecha, total] of ventasPorDia) {
+            if (total > mejorDia.total) {
+                mejorDia = { fecha, total };
+            }
+        }
+        
+        // Promedio diario
+        const dias = Math.max(1, Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24)));
+        const promedioDiario = totalVentas / dias;
+        
         return {
-            totalPasteles, totalBebidas, totalEfectivo, totalNequi,
-            cantidadPasteles, cantidadBebidas,
-            ventasPastelesFiltradas, ventasBebidasFiltradas, transferenciasFiltradas
+            totalVentas,
+            totalNequi,
+            totalPasteles: cantidadPasteles,
+            totalBebidas: cantidadBebidas,
+            totalCierres,
+            promedioDiario,
+            mejorDia,
+            ventasPorDia,
+            transacciones: pastelesRango.length + bebidasRango.length + nequiRango.length
         };
     }
 
-    // ==================== ESTADÍSTICAS DEL PERÍODO ====================
-    function getEstadisticasPeriodo(fechaInicio, fechaFin) {
-        const datos = obtenerDatosLocalStorage();
-        const { cierres } = datos;
-        const cierresFiltrados = cierres.filter(c => {
-            try {
-                const fechaCierre = new Date(c.fecha_cierre);
-                return fechaCierre >= fechaInicio && fechaCierre <= fechaFin;
-            } catch (e) { return false; }
-        });
-        let totalVentas = 0, totalNequi = 0, totalPasteles = 0, totalCierres = cierresFiltrados.length;
-        let mejorDia = { fecha: null, total: 0 };
-        let ventasPorDia = new Map();
-        cierresFiltrados.forEach(c => {
-            const ventas = obtenerVentasPorApertura(c.apertura_id, datos);
-            totalVentas += ventas.totalEfectivo || 0;
-            totalNequi += ventas.totalNequi || 0;
-            totalPasteles += ventas.cantidadPasteles || 0;
-            try {
-                const fechaKey = new Date(c.fecha_cierre).toISOString().split('T')[0];
-                const totalDia = (ventas.totalEfectivo || 0) + (ventas.totalNequi || 0);
-                ventasPorDia.set(fechaKey, (ventasPorDia.get(fechaKey) || 0) + totalDia);
-            } catch (e) {}
-        });
-        for (const [fecha, total] of ventasPorDia) {
-            if (total > mejorDia.total) { mejorDia = { fecha, total }; }
-        }
-        const dias = Math.max(1, Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24)));
-        const promedioDiario = totalVentas / dias;
-        return { totalVentas, totalNequi, totalPasteles, totalCierres, promedioDiario, mejorDia, ventasPorDia };
-    }
-
     // ==================== TOP PRODUCTOS ====================
-    function getTopProductos(fechaInicio, fechaFin) {
-        const datos = obtenerDatosLocalStorage();
-        const { cierres, productos } = datos;
+    function calcularTopProductos(fechaInicio, fechaFin) {
+        const { ventasPasteles, ventasBebidas, productos } = datosCache;
         const productosMap = {};
-        const cierresFiltrados = cierres.filter(c => {
-            try {
-                const fechaCierre = new Date(c.fecha_cierre);
-                return fechaCierre >= fechaInicio && fechaCierre <= fechaFin;
-            } catch (e) { return false; }
+        
+        const enRango = (fechaStr) => {
+            if (!fechaStr) return false;
+            const fecha = new Date(fechaStr);
+            return fecha >= fechaInicio && fecha <= fechaFin;
+        };
+        
+        // Agregar pasteles
+        ventasPasteles.filter(v => enRango(v.fecha)).forEach(v => {
+            const nombre = 'Pastel Tradicional';
+            const cantidad = Number(v.cantidad) || 0;
+            const total = Number(v.subtotal) || 0;
+            if (!productosMap[nombre]) {
+                productosMap[nombre] = { nombre, cantidad: 0, total: 0, categoria: 'Pasteles' };
+            }
+            productosMap[nombre].cantidad += cantidad;
+            productosMap[nombre].total += total;
         });
-        cierresFiltrados.forEach(c => {
-            const ventas = obtenerVentasPorApertura(c.apertura_id, datos);
-            ventas.ventasPastelesFiltradas?.forEach(v => {
-                const nombre = 'Pastel Tradicional';
-                const cantidad = v.cantidad || 0;
-                const total = cantidad * (v.precio_unitario || 2000);
-                if (!productosMap[nombre]) {
-                    productosMap[nombre] = { nombre, cantidad: 0, total: 0, categoria: 'Pasteles' };
-                }
-                productosMap[nombre].cantidad += cantidad;
-                productosMap[nombre].total += total;
-            });
-            ventas.ventasBebidasFiltradas?.forEach(v => {
-                const producto = productos.find(p => String(p.id) === String(v.producto_id));
-                const nombre = producto?.nombre || 'Bebida Desconocida';
-                const categoria = producto?.categoria || 'Bebidas';
-                const cantidad = v.cantidad || 1;
-                const total = v.subtotal || 0;
-                if (!productosMap[nombre]) {
-                    productosMap[nombre] = { nombre, cantidad: 0, total: 0, categoria };
-                }
-                productosMap[nombre].cantidad += cantidad;
-                productosMap[nombre].total += total;
-            });
+        
+        // Agregar bebidas
+        ventasBebidas.filter(v => enRango(v.fecha)).forEach(v => {
+            const producto = productos.find(p => String(p.id) === String(v.producto_id));
+            const nombre = producto?.nombre || 'Bebida Desconocida';
+            const categoria = producto?.categoria || 'Bebidas';
+            const cantidad = Number(v.cantidad) || 1;
+            const total = Number(v.subtotal) || 0;
+            if (!productosMap[nombre]) {
+                productosMap[nombre] = { nombre, cantidad: 0, total: 0, categoria };
+            }
+            productosMap[nombre].cantidad += cantidad;
+            productosMap[nombre].total += total;
         });
+        
         return Object.values(productosMap).sort((a, b) => b.total - a.total);
     }
 
-    // ==================== OBTENER DATOS PARA EVOLUCIÓN SEGÚN PERÍODO ====================
-    function getDatosEvolucion(periodo, fechaInicio, fechaFin) {
-        const stats = getEstadisticasPeriodo(fechaInicio, fechaFin);
-        const ventasPorDia = stats.ventasPorDia || new Map();
+    // ==================== DATOS PARA GRÁFICO ====================
+    function getDatosEvolucion(periodo, ventasPorDia) {
         let labels = [];
         let data = [];
-
+        const hoy = new Date();
+        
         if (periodo === 'diario') {
-            // Un solo día: hoy
-            const hoyStr = new Date().toISOString().split('T')[0];
-            const total = ventasPorDia.get(hoyStr) || 0;
+            const hoyStr = hoy.toISOString().split('T')[0];
             labels = ['Hoy'];
-            data = [total];
+            data = [ventasPorDia.get(hoyStr) || 0];
         } 
         else if (periodo === 'semanal') {
-            // Últimos 7 días (incluyendo hoy)
-            const hoy = new Date();
             for (let i = 6; i >= 0; i--) {
                 const fecha = new Date(hoy);
                 fecha.setDate(hoy.getDate() - i);
                 const key = fecha.toISOString().split('T')[0];
-                const total = ventasPorDia.get(key) || 0;
-                labels.push(fecha.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit' }));
-                data.push(total);
+                labels.push(fecha.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit' }));
+                data.push(ventasPorDia.get(key) || 0);
             }
         }
         else if (periodo === 'mensual') {
-            // Un solo mes: total del mes actual
             const totalMes = Array.from(ventasPorDia.values()).reduce((a, b) => a + b, 0);
-            const mesNombre = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+            const mesNombre = hoy.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
             labels = [mesNombre];
             data = [totalMes];
         }
         else if (periodo === 'anual') {
-            // 12 meses
-            const hoy = new Date();
             const año = hoy.getFullYear();
             const mesesMap = new Map();
             for (let mes = 0; mes < 12; mes++) {
@@ -542,50 +531,59 @@
             labels = mesesOrdenados.map(m => {
                 const [year, month] = m.split('-');
                 const fecha = new Date(parseInt(year), parseInt(month)-1, 1);
-                return fecha.toLocaleDateString('es-ES', { month: 'short' });
+                return fecha.toLocaleDateString('es-CO', { month: 'short' });
             });
             data = mesesOrdenados.map(m => mesesMap.get(m) || 0);
         }
         else if (periodo === 'personalizado') {
-            // Rango personalizado: mostrar por día (si son muchos, se puede agrupar, pero dejamos días)
             const keys = Array.from(ventasPorDia.keys()).sort();
             labels = keys.map(k => {
                 const d = new Date(k);
-                return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
             });
             data = keys.map(k => ventasPorDia.get(k) || 0);
         }
-
-        // Si no hay datos, mostrar un placeholder
+        
         if (labels.length === 0) {
             labels = ['Sin datos'];
             data = [0];
         }
-
+        
         return { labels, data };
     }
 
     // ==================== ACTUALIZAR DASHBOARD ====================
-    function actualizarDashboard() {
+    async function actualizarDashboard() {
         console.log('🔄 Actualizando dashboard...');
+        
+        // Cargar datos desde Supabase
+        const exito = await cargarDatos();
+        if (!exito) {
+            console.error('No se pudieron cargar los datos');
+            return;
+        }
+        
+        actualizarEstadoTurno();
+        
         try {
             const { fechaInicio, fechaFin } = obtenerFechasPeriodo();
             const periodo = document.getElementById('periodoSelect').value;
-            const stats = getEstadisticasPeriodo(fechaInicio, fechaFin);
-
+            const stats = calcularEstadisticas(fechaInicio, fechaFin);
+            
             // Actualizar tarjetas
-            document.getElementById('totalVentasStats').textContent = `$${stats.totalVentas.toLocaleString('es-ES')}`;
-            document.getElementById('totalNequiStats').textContent = `$${stats.totalNequi.toLocaleString('es-ES')}`;
+            document.getElementById('totalVentasStats').textContent = `$${stats.totalVentas.toLocaleString('es-CO')}`;
+            document.getElementById('totalNequiStats').textContent = `$${stats.totalNequi.toLocaleString('es-CO')}`;
             document.getElementById('totalPastelesStats').textContent = stats.totalPasteles || 0;
             document.getElementById('totalCierresStats').textContent = stats.totalCierres || 0;
-            document.getElementById('promedioDiario').textContent = `$${Math.round(stats.promedioDiario || 0).toLocaleString('es-ES')}`;
+            document.getElementById('promedioDiario').textContent = `$${Math.round(stats.promedioDiario || 0).toLocaleString('es-CO')}`;
+            
             const mejorDiaFormateado = stats.mejorDia?.fecha ? 
-                `${formatearFechaEnEspanol(stats.mejorDia.fecha)} ($${(stats.mejorDia.total || 0).toLocaleString('es-ES')})` : '-';
+                `${formatearFechaEnEspanol(stats.mejorDia.fecha)} ($${(stats.mejorDia.total || 0).toLocaleString('es-CO')})` : '-';
             document.getElementById('mejorDia').textContent = mejorDiaFormateado;
-            document.getElementById('totalTransacciones').textContent = stats.totalCierres || 0;
-
+            document.getElementById('totalTransacciones').textContent = stats.transacciones || 0;
+            
             // Top productos
-            const topProductos = getTopProductos(fechaInicio, fechaFin);
+            const topProductos = calcularTopProductos(fechaInicio, fechaFin);
             const containerTop = document.getElementById('topProductosLista');
             if (topProductos.length === 0) {
                 containerTop.innerHTML = '<div class="no-data">🍰 No hay productos vendidos en este período</div>';
@@ -604,16 +602,16 @@
                             </div>
                             <div style="text-align:right;">
                                 <div class="top-cantidad">${item.cantidad} ud</div>
-                                <div class="top-total">$${item.total.toLocaleString('es-ES')}</div>
+                                <div class="top-total">$${item.total.toLocaleString('es-CO')}</div>
                             </div>
                         </div>
                     `;
                 });
                 containerTop.innerHTML = html;
             }
-
-            // ===== GRÁFICO ÚNICO: Evolución de ventas =====
-            const datosEvolucion = getDatosEvolucion(periodo, fechaInicio, fechaFin);
+            
+            // Gráfico
+            const datosEvolucion = getDatosEvolucion(periodo, stats.ventasPorDia);
             const ctxVentas = document.getElementById('chartVentas');
             if (ctxVentas) {
                 if (chartVentas) chartVentas.destroy();
@@ -631,23 +629,23 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        barPercentage: 0.6,          // Reduce el ancho de cada barra (0.5-0.8 es típico)
+                        barPercentage: 0.6,
                         categoryPercentage: 0.8,
                         plugins: {
-                            tooltip: { callbacks: { label: (ctx) => `$${ctx.raw.toLocaleString('es-ES')}` } },
+                            tooltip: { callbacks: { label: (ctx) => `$${ctx.raw.toLocaleString('es-CO')}` } },
                             legend: { position: 'top', labels: { font: { size: 11 } } }
                         },
                         scales: {
                             y: {
                                 beginAtZero: true,
-                                ticks: { callback: (value) => '$' + value.toLocaleString('es-ES') }
+                                ticks: { callback: (value) => '$' + value.toLocaleString('es-CO') }
                             }
                         }
                     }
                 });
             }
-
-            // Actualizar título del gráfico según período
+            
+            // Título
             const tituloMap = {
                 'diario': 'Ventas del día (Hoy)',
                 'semanal': 'Ventas de los últimos 7 días',
@@ -656,13 +654,13 @@
                 'personalizado': 'Ventas en el rango seleccionado'
             };
             document.getElementById('tituloEvolucion').innerHTML = `<span>📊</span> ${tituloMap[periodo] || 'Evolución de ventas'}`;
-
-            // Badge de información
+            
+            // Badge
             const ahora = new Date();
             const periodoText = `${formatearFechaEnEspanol(fechaInicio.toISOString())} — ${formatearFechaEnEspanol(fechaFin.toISOString())}`;
-            document.getElementById('infoBadge').innerHTML = `📅 Período: ${periodoText} • 🍰 Actualizado ${ahora.toLocaleTimeString('es-ES')}`;
-
-            console.log('✅ Dashboard actualizado correctamente');
+            document.getElementById('infoBadge').innerHTML = `📅 Período: ${periodoText} • 🍰 Actualizado ${ahora.toLocaleTimeString('es-CO')}`;
+            
+            console.log('✅ Dashboard actualizado');
         } catch (error) {
             console.error('❌ Error al actualizar dashboard:', error);
         }
@@ -694,87 +692,50 @@
         const desde = document.getElementById('fechaDesdePersonal').value;
         const hasta = document.getElementById('fechaHastaPersonal').value;
         if (!desde || !hasta) {
-            alert('⚠️ Por favor selecciona ambas fechas (Desde y Hasta)');
+            alert('⚠️ Por favor selecciona ambas fechas');
             return;
         }
         if (new Date(desde) > new Date(hasta)) {
-            alert('⚠️ La fecha "Desde" no puede ser mayor que la fecha "Hasta"');
+            alert('⚠️ La fecha "Desde" no puede ser mayor que "Hasta"');
             return;
         }
         actualizarDashboard();
     }
 
-    // ==================== CREAR CIERRES DE PRUEBA (SOLO UNA VEZ) ====================
-function crearCierresConFechasReales() {
-    // Verificar si ya se crearon los datos de prueba (flag)
-    const yaInicializado = localStorage.getItem('pos_cierres_inicializados');
-    
-    if (yaInicializado === 'true') {
-        console.log('📊 Los datos de prueba ya fueron creados anteriormente.');
-        return;
-    }
-    
-    // Verificar si ya existen cierres reales
-   // En lugar de llamar a crearCierresConFechasReales() siempre,
-// solo si no hay datos y es necesario
-const cierresExistentes = JSON.parse(localStorage.getItem('pos_cierres_caja') || '[]');
-if (cierresExistentes.length === 0) {
-    crearCierresConFechasReales();
-} else {
-    console.log(`📊 Ya existen ${cierresExistentes.length} cierres. No se crearán datos de prueba.`);
-}
-    
-    // Solo crear datos de prueba si NO hay ningún cierre
-    if (cierresExistentes.length === 0) {
-        console.log('📊 No hay cierres existentes. Creando datos de prueba...');
-        // ... aquí va TODO el código que crea los cierres de prueba
-        // (el mismo código que ya tenías)
-        const nuevosCierres = [];
-        const hoy = new Date();
-        const añoActual = hoy.getFullYear();
-        // ... resto del código de creación ...
-        
-        // Guardar los cierres
-        localStorage.setItem('pos_cierres_caja', JSON.stringify(nuevosCierres));
-        // Marcar como inicializado para que no se vuelva a ejecutar
-        localStorage.setItem('pos_cierres_inicializados', 'true');
-        console.log('✅ Datos de prueba creados exitosamente.');
-    } else {
-        localStorage.setItem('pos_cierres_inicializados', 'true');
-    }
-}
-
-
     // ==================== INICIALIZACIÓN ====================
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('🚀 Inicializando dashboard de análisis...');
-        crearCierresConFechasReales();
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log('🚀 Inicializando dashboard...');
         actualizarFecha();
-        actualizarEstadoTurno();
+        
         const periodoSelect = document.getElementById('periodoSelect');
-        if (periodoSelect) periodoSelect.addEventListener('change', cambiarPeriodo);
+        if (periodoSelect) {
+            periodoSelect.value = 'semanal';
+            periodoSelect.addEventListener('change', cambiarPeriodo);
+        }
+        
         const fechaDesde = document.getElementById('fechaDesdePersonal');
         const fechaHasta = document.getElementById('fechaHastaPersonal');
         if (fechaDesde) fechaDesde.addEventListener('change', actualizarDashboard);
         if (fechaHasta) fechaHasta.addEventListener('change', actualizarDashboard);
+        
         const hoy = new Date();
         const hace7Dias = new Date(hoy);
         hace7Dias.setDate(hoy.getDate() - 7);
         if (fechaDesde && !fechaDesde.value) fechaDesde.value = hace7Dias.toISOString().split('T')[0];
         if (fechaHasta && !fechaHasta.value) fechaHasta.value = hoy.toISOString().split('T')[0];
-        setTimeout(() => {
-            actualizarDashboard();
-            console.log('✅ Dashboard inicial cargado');
-        }, 500);
-        setInterval(() => { actualizarEstadoTurno(); actualizarDashboard(); }, 30000);
+        
+        await actualizarDashboard();
+        
+        // Refrescar cada 30 segundos
+        setInterval(actualizarDashboard, 30000);
+        
+        console.log('✅ Dashboard inicializado');
     });
 
     // ==================== EXPONER FUNCIONES ====================
     window.actualizarDashboard = actualizarDashboard;
     window.cambiarPeriodo = cambiarPeriodo;
     window.aplicarFiltroPersonalizado = aplicarFiltroPersonalizado;
-    window.actualizarEstadoTurno = actualizarEstadoTurno;
-    window.eliminarTodosLosCierres = eliminarTodosLosCierres;
 </script>
 </body>
 </html>

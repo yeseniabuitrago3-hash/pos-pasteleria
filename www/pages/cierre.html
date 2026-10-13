@@ -504,55 +504,22 @@
             </div>
         </div>
     </div>
-    
-    <script>
-    // ==================== BASE DE DATOS LOCAL (localStorage) ====================
-    const DB = {
-        get: function(key) {
-            try {
-                const data = localStorage.getItem('pos_' + key);
-                return data ? JSON.parse(data) : [];
-            } catch (e) {
-                console.error('Error en DB.get:', e);
-                return [];
-            }
-        },
-        set: function(key, data) {
-            try {
-                localStorage.setItem('pos_' + key, JSON.stringify(data));
-                return true;
-            } catch (e) {
-                console.error('Error en DB.set:', e);
-                return false;
-            }
-        }
-    };
+   <script>
+    // ============================================================
+    // APIS (conexión con Supabase)
+    // ============================================================
+    const API_APERTURAS = '../../php/api/aperturas.php';
+    const API_CIERRES = '../../php/api/cierres.php';
+    const API_VENTAS_PASTELES = '../../php/api/ventas_pasteles.php';
+    const API_VENTAS_BEBIDAS = '../../php/api/ventas_bebidas.php';
+    const API_NEQUI = '../../php/api/nequi.php';
 
-    // ==================== FUNCIÓN PARA OBTENER APERTURA ACTUAL ====================
-    function getAperturaActual() {
-        try {
-            const aperturaId = localStorage.getItem('pos_apertura_actual_id');
-            if (aperturaId) {
-                const aperturas = DB.get('aperturas_caja');
-                const apertura = aperturas.find(a => String(a.id) === String(aperturaId) && a.estado === 'abierta');
-                if (apertura) return apertura;
-            }
-            
-            const aperturas = DB.get('aperturas_caja');
-            const aperturaAbierta = aperturas.find(a => a.estado === 'abierta');
-            if (aperturaAbierta) {
-                localStorage.setItem('pos_apertura_actual_id', aperturaAbierta.id);
-                return aperturaAbierta;
-            }
-            
-            return null;
-        } catch (e) {
-            console.error('Error al obtener apertura:', e);
-            return null;
-        }
-    }
+    // ==================== VARIABLES GLOBALES ====================
+    let aperturaActual = null;
+    let datosCierreActual = null;
+    let datosCierreModal = null;
 
-    // ==================== FUNCIONES DE FORMATEO ====================
+    // ==================== FORMATEO ====================
     function formatearNumero(input) {
         let valor = input.value.replace(/[^0-9]/g, '');
         if (valor === '') { input.value = ''; return; }
@@ -574,105 +541,131 @@
         }
     }
 
-    // ==================== CARGAR DATOS DE CIERRE ====================
-    function cargarDatosCierre() {
-        const apertura = getAperturaActual();
-        if (!apertura) {
+    // ==================== OBTENER APERTURA ACTIVA (SUPABASE) ====================
+    async function obtenerAperturaActiva() {
+        try {
+            const response = await fetch(`${API_APERTURAS}?estado=abierta`);
+            const result = await response.json();
+            if (result.success && result.data && result.data.length > 0) {
+                return result.data[0];
+            }
+            return null;
+        } catch (e) {
+            console.error('Error al obtener apertura:', e);
+            return null;
+        }
+    }
+
+    // ==================== CARGAR DATOS DE CIERRE (SUPABASE) ====================
+    async function cargarDatosCierre() {
+        aperturaActual = await obtenerAperturaActiva();
+        
+        if (!aperturaActual) {
             document.getElementById('resumenPastelesCierre').textContent = '$0';
             document.getElementById('resumenBebidasCierre').textContent = '$0';
             document.getElementById('totalEfectivoCierre').textContent = '$0';
             document.getElementById('totalNequiCierre').textContent = '$0';
             document.getElementById('efectivoEsperado').textContent = '$0';
+            document.getElementById('modoInfoCierre').innerHTML = '❌ No hay turno activo';
             return;
         }
         
-        const ventasPasteles = DB.get('ventas_pasteles').filter(v => Number(v.apertura_id) === Number(apertura.id));
-        const ventasBebidas = DB.get('ventas_bebidas').filter(v => Number(v.apertura_id) === Number(apertura.id));
-        const transferencias = DB.get('transferencias_nequi').filter(t => Number(t.apertura_id) === Number(apertura.id));
-        const devoluciones = DB.get('devoluciones').filter(d => Number(d.aperturaId) === Number(apertura.id));
-        
-        let totalPasteles = 0;
-        let cantidadPasteles = 0;
-        ventasPasteles.forEach(v => {
-            const devuelto = devoluciones.filter(d => Number(d.ventaId) === Number(v.id) && !d.anulada)
-                .reduce((sum, d) => sum + (d.cantidad || 0), 0);
-            const cantidadVendida = (v.cantidad || 0) - devuelto;
-            cantidadPasteles += cantidadVendida;
-            totalPasteles += cantidadVendida * (v.precio_unitario || 2000);
-        });
-        
-        let totalBebidas = 0;
-        let cantidadBebidas = 0;
-        ventasBebidas.forEach(v => {
-            const devuelto = devoluciones.filter(d => Number(d.ventaId) === Number(v.id) && !d.anulada)
-                .reduce((sum, d) => sum + (d.cantidad || 0), 0);
-            const cantidadVendida = (v.cantidad || 1) - devuelto;
-            cantidadBebidas += cantidadVendida;
-            totalBebidas += cantidadVendida * (v.precio || 0);
-        });
-        
-        const totalNequi = transferencias.reduce((sum, t) => sum + (t.monto || 0), 0);
-        const valorDevoluciones = devoluciones.reduce((sum, d) => sum + ((d.cantidad || 0) * (d.precio || 0)), 0);
-        const totalEfectivo = (totalPasteles + totalBebidas) - valorDevoluciones;
-        const cantidadDevoluciones = devoluciones.reduce((sum, d) => sum + (d.cantidad || 0), 0);
-        
-        const baseBilletes = apertura.base_billetes || 0;
-        const baseMonedas = apertura.base_monedas || 0;
-        const baseTotal = baseBilletes + baseMonedas;
-        const efectivoEsperado = baseTotal + totalEfectivo;
-        
-        // Resumen de ventas
-        document.getElementById('resumenPastelesCierre').textContent = `$${totalPasteles.toLocaleString('es-CO')}`;
-        document.getElementById('resumenBebidasCierre').textContent = `$${totalBebidas.toLocaleString('es-CO')}`;
-        document.getElementById('devolucionesCantidad').textContent = cantidadDevoluciones;
-        document.getElementById('devolucionesValor').textContent = `$${valorDevoluciones.toLocaleString('es-CO')}`;
-        document.getElementById('totalEfectivoCierre').textContent = `$${totalEfectivo.toLocaleString('es-CO')}`;
-        document.getElementById('totalNequiCierre').textContent = `$${totalNequi.toLocaleString('es-CO')}`;
-        
-        // Base inicial
-        document.getElementById('baseBilletesCierre').textContent = `$${baseBilletes.toLocaleString('es-CO')}`;
-        document.getElementById('baseMonedasCierre').textContent = `$${baseMonedas.toLocaleString('es-CO')}`;
-        document.getElementById('baseTotalCierre').textContent = `$${baseTotal.toLocaleString('es-CO')}`;
-        
-        // Efectivo esperado
-        document.getElementById('efectivoEsperado').textContent = `$${efectivoEsperado.toLocaleString('es-CO')}`;
-        
-        const modoInfo = document.getElementById('modoInfoCierre');
-        const modoActual = apertura.modo || 'tarde';
-        
-        if (modoActual === 'manana') {
-            modoInfo.className = 'modo-info-cierre modo-manana';
-            modoInfo.innerHTML = `
-                🌅 <strong>Modo Mañana - Cierre Simplificado</strong><br>
-                Dueño: ${apertura.responsable || 'No especificado'}<br>
-                🍰 Pasteles: ${cantidadPasteles} unidades | 🥤 Bebidas: ${cantidadBebidas} unidades
-            `;
-            document.getElementById('seccionVerificacion').style.display = 'none';
-            document.getElementById('baseInicialCard').style.display = 'block';
-        } else {
-            modoInfo.className = 'modo-info-cierre modo-tarde';
-            modoInfo.innerHTML = `
-                🌙 <strong>Modo Tarde - Cierre Completo</strong><br>
-                Empleada: ${apertura.responsable || 'No especificado'}<br>
-                ⚠️ Debes contar TODO el dinero en caja.
-            `;
-            document.getElementById('seccionVerificacion').style.display = 'block';
-            document.getElementById('baseInicialCard').style.display = 'block';
+        try {
+            // Cargar ventas desde Supabase en paralelo
+            const [pastelesRes, bebidasRes, nequiRes] = await Promise.all([
+                fetch(`${API_VENTAS_PASTELES}?apertura_id=${aperturaActual.id}`),
+                fetch(`${API_VENTAS_BEBIDAS}?apertura_id=${aperturaActual.id}`),
+                fetch(`${API_NEQUI}?apertura_id=${aperturaActual.id}`)
+            ]);
+            
+            const pastelesData = await pastelesRes.json();
+            const bebidasData = await bebidasRes.json();
+            const nequiData = await nequiRes.json();
+            
+            const ventasPasteles = pastelesData.data || [];
+            const ventasBebidas = bebidasData.data || [];
+            const transferencias = nequiData.data || [];
+            
+            // Calcular totales
+            let totalPasteles = 0;
+            let cantidadPasteles = 0;
+            ventasPasteles.forEach(v => {
+                cantidadPasteles += Number(v.cantidad) || 0;
+                totalPasteles += Number(v.subtotal) || 0;
+            });
+            
+            let totalBebidas = 0;
+            let cantidadBebidas = 0;
+            ventasBebidas.forEach(v => {
+                cantidadBebidas += Number(v.cantidad) || 0;
+                totalBebidas += Number(v.subtotal) || 0;
+            });
+            
+            const totalNequi = transferencias.reduce((sum, t) => sum + Number(t.monto || 0), 0);
+            const totalEfectivo = totalPasteles + totalBebidas;
+            
+            const baseBilletes = Number(aperturaActual.base_billetes) || 0;
+            const baseMonedas = Number(aperturaActual.base_monedas) || 0;
+            const baseTotal = baseBilletes + baseMonedas;
+            const efectivoEsperado = baseTotal + totalEfectivo;
+            
+            // Actualizar UI
+            document.getElementById('resumenPastelesCierre').textContent = `$${totalPasteles.toLocaleString('es-CO')}`;
+            document.getElementById('resumenBebidasCierre').textContent = `$${totalBebidas.toLocaleString('es-CO')}`;
+            document.getElementById('devolucionesCantidad').textContent = '0';
+            document.getElementById('devolucionesValor').textContent = '$0';
+            document.getElementById('totalEfectivoCierre').textContent = `$${totalEfectivo.toLocaleString('es-CO')}`;
+            document.getElementById('totalNequiCierre').textContent = `$${totalNequi.toLocaleString('es-CO')}`;
+            
+            document.getElementById('baseBilletesCierre').textContent = `$${baseBilletes.toLocaleString('es-CO')}`;
+            document.getElementById('baseMonedasCierre').textContent = `$${baseMonedas.toLocaleString('es-CO')}`;
+            document.getElementById('baseTotalCierre').textContent = `$${baseTotal.toLocaleString('es-CO')}`;
+            
+            document.getElementById('efectivoEsperado').textContent = `$${efectivoEsperado.toLocaleString('es-CO')}`;
+            
+            const modoInfo = document.getElementById('modoInfoCierre');
+            const modoActual = aperturaActual.modo || 'manana';
+            
+            if (modoActual === 'manana') {
+                modoInfo.className = 'modo-info-cierre modo-manana';
+                modoInfo.innerHTML = `
+                    🌅 <strong>Modo Mañana - Cierre Simplificado</strong><br>
+                    Dueño: ${aperturaActual.responsable || 'No especificado'}<br>
+                    🍰 Pasteles: ${cantidadPasteles} unidades | 🥤 Bebidas: ${cantidadBebidas} unidades
+                `;
+                document.getElementById('seccionVerificacion').style.display = 'none';
+                document.getElementById('baseInicialCard').style.display = 'block';
+            } else {
+                modoInfo.className = 'modo-info-cierre modo-tarde';
+                modoInfo.innerHTML = `
+                    🌙 <strong>Modo Tarde - Cierre Completo</strong><br>
+                    Empleada: ${aperturaActual.responsable || 'No especificado'}<br>
+                    ⚠️ Debes contar TODO el dinero en caja.
+                `;
+                document.getElementById('seccionVerificacion').style.display = 'block';
+                document.getElementById('baseInicialCard').style.display = 'block';
+            }
+            
+            // Guardar datos en variable global
+            window.datosCierreActual = {
+                totalPasteles, totalBebidas, totalEfectivo, totalNequi,
+                cantidadPasteles, cantidadBebidas,
+                baseBilletes, baseMonedas, baseTotal,
+                efectivoEsperado,
+                aperturaId: aperturaActual.id,
+                modo: modoActual,
+                responsable: aperturaActual.responsable,
+                valorDevoluciones: 0,
+                cantidadDevoluciones: 0
+            };
+            
+        } catch (e) {
+            console.error('Error al cargar datos:', e);
+            document.getElementById('modoInfoCierre').innerHTML = '❌ Error al cargar datos';
         }
-        
-        window.datosCierreActual = {
-            totalPasteles, totalBebidas, totalEfectivo, totalNequi,
-            cantidadPasteles, cantidadBebidas,
-            baseBilletes, baseMonedas, baseTotal,
-            efectivoEsperado,
-            aperturaId: apertura.id,
-            modo: modoActual,
-            responsable: apertura.responsable,
-            valorDevoluciones, cantidadDevoluciones
-        };
     }
 
-    // ==================== VERIFICAR CAJA (SIMPLIFICADA) ====================
+    // ==================== VERIFICAR CAJA ====================
     function verificarCaja() {
         const datos = window.datosCierreActual;
         if (!datos || datos.modo === 'manana') return;
@@ -689,7 +682,6 @@
             }
         }
         
-        // Ocultar mensaje si no hay datos
         const mensajeTotal = document.getElementById('mensajeDiferenciaTotal');
         if (!efectivoIngresado) {
             mensajeTotal.style.display = 'none';
@@ -699,7 +691,6 @@
         const efectivoEsperado = datos.efectivoEsperado || 0;
         const diferencia = efectivoContado - efectivoEsperado;
         
-        // Mostrar mensaje
         mensajeTotal.style.display = 'block';
         mensajeTotal.className = 'mensaje-diferencia';
         
@@ -714,12 +705,12 @@
             estado = '⚠️ SOBRANTE EN CAJA';
             icono = '⚠️';
             clase = 'mensaje-sobrante';
-            mensajeAdicional = `💰 Hay $${diferencia.toLocaleString('es-CO')} más de lo esperado. Verifique si hubo algún ingreso no registrado.`;
+            mensajeAdicional = `💰 Hay $${diferencia.toLocaleString('es-CO')} más de lo esperado.`;
         } else {
             estado = '❌ FALTANTE EN CAJA';
             icono = '❌';
             clase = 'mensaje-faltante';
-            mensajeAdicional = `🔍 Faltan $${Math.abs(diferencia).toLocaleString('es-CO')} en caja. Verifique si hubo algún gasto no registrado o error en el conteo.`;
+            mensajeAdicional = `🔍 Faltan $${Math.abs(diferencia).toLocaleString('es-CO')} en caja.`;
         }
         
         mensajeTotal.classList.add(clase);
@@ -735,16 +726,13 @@
                       diferencia > 0 ? `➕ Sobrante: +$${diferencia.toLocaleString('es-CO')}` : 
                       `➖ Faltante: -$${Math.abs(diferencia).toLocaleString('es-CO')}`}
                 </div>
-                <div style="margin-top:8px; color:#666;">
-                    ${mensajeAdicional}
-                </div>
+                <div style="margin-top:8px; color:#666;">${mensajeAdicional}</div>
                 ${diferencia !== 0 ? `<div style="margin-top:10px; padding:8px; background:rgba(255,0,0,0.1); border-radius:5px; border-left:3px solid #dc3545;">
                     <strong>⚠️ IMPORTANTE:</strong> Esta diferencia debe ser justificada en las observaciones.
                 </div>` : ''}
             </div>
         `;
         
-        // Guardar diferencias calculadas
         window.diferenciasCalculadas = {
             diferencia: diferencia,
             efectivoEsperado: efectivoEsperado,
@@ -752,86 +740,63 @@
         };
     }
 
-    // ==================== CONFIRMAR CIERRE CON MODAL PERSONALIZADO ====================
-    let datosCierreModal = null;
-
-    function confirmarCierre() {
+    // ==================== CONFIRMAR CIERRE ====================
+    async function confirmarCierre() {
         const datos = window.datosCierreActual;
         if (!datos) {
             alert('❌ No hay datos de cierre disponibles');
             return;
         }
         
-        const apertura = getAperturaActual();
-        if (!apertura) {
+        if (!aperturaActual) {
             alert('❌ No hay un turno abierto para cerrar');
             return;
         }
         
-        // MODO MAÑANA - Usar confirm nativo (simple)
+        // MODO MAÑANA - Cierre simplificado
         if (datos.modo === 'manana') {
-            const mensajeResumen = `╔═══════════════════════════════════════════╗
-║       CIERRE DE TURNO - MAÑANA          ║
-╠═══════════════════════════════════════════╣
-║ 👤 Dueño: ${datos.responsable || 'No especificado'}
-║ 🍰 Pasteles: ${datos.cantidadPasteles || 0} unidades
-║ 🥤 Bebidas: ${datos.cantidadBebidas || 0} unidades
-║ ↔️ Devoluciones: ${datos.cantidadDevoluciones || 0} unidades
-║ 💰 Total ventas: $${datos.totalEfectivo.toLocaleString('es-CO')}
-║ 📱 Transferencias: $${datos.totalNequi.toLocaleString('es-CO')}
-╠═══════════════════════════════════════════╣
-║ 📋 Cierre simplificado - Sin conteo      ║
-╚═══════════════════════════════════════════╝`;
+            const mensajeResumen = `📋 CIERRE DE TURNO - MAÑANA\n\n` +
+                `👤 Dueño: ${datos.responsable || 'No especificado'}\n` +
+                `🍰 Pasteles: ${datos.cantidadPasteles || 0} unidades\n` +
+                `🥤 Bebidas: ${datos.cantidadBebidas || 0} unidades\n` +
+                `💰 Total ventas: $${datos.totalEfectivo.toLocaleString('es-CO')}\n` +
+                `📱 Transferencias: $${datos.totalNequi.toLocaleString('es-CO')}\n\n` +
+                `¿Confirmar y finalizar el turno?`;
 
-            if (!confirm(mensajeResumen + '\n\n¿Confirmar y finalizar el turno de mañana?')) return;
+            if (!confirm(mensajeResumen)) return;
             
             try {
-                const cierre = {
-                    id: Date.now(),
-                    apertura_id: apertura.id,
+                await crearCierre({
+                    apertura_id: aperturaActual.id,
                     modo: 'manana',
-                    responsable: datos.responsable || 'No especificado',
-                    total_ventas_pasteles: datos.totalPasteles || 0,
-                    total_ventas_bebidas: datos.totalBebidas || 0,
-                    total_nequi: datos.totalNequi || 0,
-                    total_efectivo: datos.totalEfectivo || 0,
-                    cantidad_pasteles: datos.cantidadPasteles || 0,
-                    cantidad_bebidas: datos.cantidadBebidas || 0,
-                    cantidad_devoluciones: datos.cantidadDevoluciones || 0,
-                    valor_devoluciones: datos.valorDevoluciones || 0,
-                    base_total: datos.baseTotal || 0,
-                    base_billetes: datos.baseBilletes || 0,
-                    base_monedas: datos.baseMonedas || 0,
+                    responsable: datos.responsable,
+                    total_ventas_pasteles: datos.totalPasteles,
+                    total_ventas_bebidas: datos.totalBebidas,
+                    total_nequi: datos.totalNequi,
+                    total_efectivo: datos.totalEfectivo,
+                    cantidad_pasteles: datos.cantidadPasteles,
+                    cantidad_bebidas: datos.cantidadBebidas,
+                    cantidad_devoluciones: 0,
+                    valor_devoluciones: 0,
+                    base_total: datos.baseTotal,
+                    base_billetes: datos.baseBilletes,
+                    base_monedas: datos.baseMonedas,
                     efectivo_esperado: 0,
                     efectivo_contado: 0,
                     diferencia: 0,
-                    observaciones: document.getElementById('observacionesCierre')?.value || 'Cierre simplificado - Dueño presente',
-                    fecha_cierre: new Date().toISOString()
-                };
-                
-                const cierres = DB.get('cierres_caja');
-                cierres.push(cierre);
-                DB.set('cierres_caja', cierres);
-                
-                const aperturas = DB.get('aperturas_caja');
-                const index = aperturas.findIndex(a => String(a.id) === String(apertura.id));
-                if (index !== -1) {
-                    aperturas[index].estado = 'cerrada';
-                    DB.set('aperturas_caja', aperturas);
-                }
-                localStorage.removeItem('pos_apertura_actual_id');
+                    observaciones: document.getElementById('observacionesCierre')?.value || 'Cierre simplificado - Dueño presente'
+                });
                 
                 alert('✅ ¡CIERRE EXITOSO! Turno de mañana finalizado.');
-                setTimeout(() => { location.reload(); }, 1500);
+                setTimeout(() => { window.location.href = 'ventas.html'; }, 1500);
                 
             } catch (error) {
-                console.error('❌ Error al guardar cierre:', error);
-                alert('❌ Error al guardar el cierre: ' + error.message);
+                alert('❌ Error al guardar cierre: ' + error.message);
             }
             return;
         }
         
-        // ===== MODO TARDE - Usar modal personalizado =====
+        // MODO TARDE - Cierre completo
         const efectivoContadoInput = document.getElementById('efectivoContado');
         let efectivoContado = 0;
         
@@ -848,18 +813,15 @@
         const dif = window.diferenciasCalculadas || {};
         const diferencia = dif.diferencia || 0;
         
-        // Guardar datos para usar en el modal
         datosCierreModal = {
             datos,
-            apertura,
+            apertura: aperturaActual,
             efectivoContado,
             diferencia
         };
         
-        // Construir el contenido del modal
         const modalBody = document.getElementById('modalBody');
         
-        // Determinar estado
         let estadoClase = '';
         let estadoTexto = '';
         let estadoIcono = '';
@@ -869,7 +831,6 @@
             estadoClase = 'estado-correcto';
             estadoTexto = '✅ CAJA CUADRADA';
             estadoIcono = '✅';
-            btnClase = '';
         } else if (diferencia > 0) {
             estadoClase = 'estado-sobrante';
             estadoTexto = '⚠️ SOBRANTE EN CAJA';
@@ -882,10 +843,9 @@
             btnClase = 'faltante';
         }
         
-        // Construir HTML del modal (SIMPLIFICADO)
         modalBody.innerHTML = `
             <div class="resumen-info">
-                <p><span class="label">👤 Empleada:</span><span class="value">${datos.responsable || 'No especificado'}</span></p>
+                <p><span class="label">👤 Empleada:</span><span class="value">${datos.responsable}</span></p>
                 <p><span class="label">💰 Ventas en efectivo:</span><span class="value">$${datos.totalEfectivo.toLocaleString('es-CO')}</span></p>
                 <p><span class="label">📱 Transferencias Nequi:</span><span class="value">$${datos.totalNequi.toLocaleString('es-CO')}</span></p>
                 <p><span class="label">💵 Base inicial:</span><span class="value">$${datos.baseTotal.toLocaleString('es-CO')}</span></p>
@@ -893,87 +853,86 @@
                 <p><span class="label">📊 Efectivo Esperado:</span><span class="value destacado">$${datos.efectivoEsperado.toLocaleString('es-CO')}</span></p>
                 <p><span class="label">💵 Efectivo Contado:</span><span class="value destacado">$${efectivoContado.toLocaleString('es-CO')}</span></p>
             </div>
-            
             <div class="estado-general ${estadoClase}">
                 ${estadoTexto}
                 ${diferencia !== 0 ? `<br><span style="font-size:1rem;">${diferencia > 0 ? 'Sobrante' : 'Faltante'}: $${Math.abs(diferencia).toLocaleString('es-CO')}</span>` : ''}
             </div>
-            
             <div class="observaciones-preview">
                 <strong>📝 Observaciones:</strong>
                 ${document.getElementById('observacionesCierre')?.value || 'Sin observaciones'}
             </div>
-            
-            <div style="margin-top: 12px; font-size: 0.8rem; color: #999; text-align: center;">
-                ⚠️ Esta acción finalizará el turno y guardará todos los datos
-            </div>
         `;
         
-        // Actualizar header del modal
         document.getElementById('modalIcon').textContent = estadoIcono;
         document.getElementById('modalTitulo').textContent = estadoTexto;
         
-        // Configurar botón confirmar
         const btnConfirmar = document.getElementById('btnConfirmarCierreModal');
         btnConfirmar.className = `btn btn-confirmar ${btnClase}`;
         btnConfirmar.textContent = estadoIcono === '✅' ? '✅ Confirmar Cierre' : '⚠️ Confirmar Cierre';
         
-        // Mostrar modal
         document.getElementById('modalConfirmarCierre').classList.add('show');
     }
 
-    // ==================== CERRAR MODAL ====================
-    function cerrarModalCierre() {
-        document.getElementById('modalConfirmarCierre').classList.remove('show');
+    // ==================== CREAR CIERRE EN SUPABASE ====================
+    async function crearCierre(cierre) {
+        // 1. Crear el cierre en Supabase
+        const cierreRes = await fetch(API_CIERRES, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ...cierre,
+                fecha_cierre: new Date().toISOString()
+            })
+        });
+        
+        const cierreData = await cierreRes.json();
+        if (!cierreData.success) throw new Error(cierreData.error);
+        
+        // 2. Marcar la apertura como cerrada
+        await fetch(`${API_APERTURAS}?id=${aperturaActual.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                estado: 'cerrada',
+                fecha_cierre: new Date().toISOString()
+            })
+        });
+        
+        console.log('✅ Cierre creado y apertura cerrada');
+        return cierreData.data;
     }
 
-    // ==================== CONFIRMAR CIERRE DESDE EL MODAL ====================
-    function confirmarCierreAccion() {
+    // ==================== CONFIRMAR CIERRE DESDE MODAL ====================
+    async function confirmarCierreAccion() {
         const modal = document.getElementById('modalConfirmarCierre');
         if (!modal.classList.contains('show')) return;
-        
         if (!datosCierreModal) return;
         
-        const { datos, apertura, efectivoContado, diferencia } = datosCierreModal;
+        const { datos, efectivoContado, diferencia } = datosCierreModal;
         
-        // Cerrar modal
         cerrarModalCierre();
         
         try {
-            const cierre = {
-                id: Date.now(),
-                apertura_id: apertura.id,
+            await crearCierre({
+                apertura_id: aperturaActual.id,
                 modo: 'tarde',
-                responsable: datos.responsable || 'No especificado',
-                total_ventas_pasteles: datos.totalPasteles || 0,
-                total_ventas_bebidas: datos.totalBebidas || 0,
-                total_nequi: datos.totalNequi || 0,
-                total_efectivo: datos.totalEfectivo || 0,
-                cantidad_pasteles: datos.cantidadPasteles || 0,
-                cantidad_bebidas: datos.cantidadBebidas || 0,
-                cantidad_devoluciones: datos.cantidadDevoluciones || 0,
-                valor_devoluciones: datos.valorDevoluciones || 0,
-                base_total: datos.baseTotal || 0,
-                base_billetes: datos.baseBilletes || 0,
-                base_monedas: datos.baseMonedas || 0,
-                efectivo_esperado: datos.efectivoEsperado || 0,
+                responsable: datos.responsable,
+                total_ventas_pasteles: datos.totalPasteles,
+                total_ventas_bebidas: datos.totalBebidas,
+                total_nequi: datos.totalNequi,
+                total_efectivo: datos.totalEfectivo,
+                cantidad_pasteles: datos.cantidadPasteles,
+                cantidad_bebidas: datos.cantidadBebidas,
+                cantidad_devoluciones: 0,
+                valor_devoluciones: 0,
+                base_total: datos.baseTotal,
+                base_billetes: datos.baseBilletes,
+                base_monedas: datos.baseMonedas,
+                efectivo_esperado: datos.efectivoEsperado,
                 efectivo_contado: efectivoContado,
                 diferencia: diferencia,
-                observaciones: document.getElementById('observacionesCierre')?.value || 'Sin observaciones',
-                fecha_cierre: new Date().toISOString()
-            };
-            
-            const cierres = DB.get('cierres_caja');
-            cierres.push(cierre);
-            DB.set('cierres_caja', cierres);
-            
-            const aperturas = DB.get('aperturas_caja');
-            const index = aperturas.findIndex(a => String(a.id) === String(apertura.id));
-            if (index !== -1) {
-                aperturas[index].estado = 'cerrada';
-                DB.set('aperturas_caja', aperturas);
-            }
-            localStorage.removeItem('pos_apertura_actual_id');
+                observaciones: document.getElementById('observacionesCierre')?.value || 'Sin observaciones'
+            });
             
             let mensajeFinal = '✅ ¡CIERRE EXITOSO!\n\n';
             mensajeFinal += `💰 Efectivo Esperado: $${datos.efectivoEsperado.toLocaleString('es-CO')}\n`;
@@ -981,57 +940,58 @@
             mensajeFinal += `📊 Diferencia: ${diferencia >= 0 ? '+$' : '-$'}${Math.abs(diferencia).toLocaleString('es-CO')}\n\n`;
             
             if (diferencia === 0) {
-                mensajeFinal += '✅ CAJA CUADRADA - Todo coincide perfectamente.';
+                mensajeFinal += '✅ CAJA CUADRADA';
             } else if (diferencia > 0) {
-                mensajeFinal += `⚠️ SOBRANTE EN CAJA - +$${diferencia.toLocaleString('es-CO')}`;
+                mensajeFinal += `⚠️ SOBRANTE: +$${diferencia.toLocaleString('es-CO')}`;
             } else {
-                mensajeFinal += `⚠️ FALTANTE EN CAJA - -$${Math.abs(diferencia).toLocaleString('es-CO')}`;
+                mensajeFinal += `⚠️ FALTANTE: -$${Math.abs(diferencia).toLocaleString('es-CO')}`;
             }
             
             alert(mensajeFinal);
             setTimeout(() => { window.location.href = '../index.html'; }, 2000);
             
         } catch (error) {
-            console.error('❌ Error al guardar cierre:', error);
-            alert('❌ Error al guardar el cierre: ' + error.message);
+            alert('❌ Error: ' + error.message);
         }
+    }
+
+    // ==================== CERRAR MODAL ====================
+    function cerrarModalCierre() {
+        document.getElementById('modalConfirmarCierre').classList.remove('show');
     }
 
     // Cerrar modal con ESC
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            cerrarModalCierre();
-        }
+        if (e.key === 'Escape') cerrarModalCierre();
     });
 
     // Cerrar modal clickeando fuera
     document.getElementById('modalConfirmarCierre').addEventListener('click', function(e) {
-        if (e.target === this) {
-            cerrarModalCierre();
-        }
+        if (e.target === this) cerrarModalCierre();
     });
 
-    // ==================== INICIALIZAR ====================
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('🔧 Inicializando página de cierre...');
+    // ==================== INICIALIZACIÓN ====================
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log('🔧 Inicializando cierre...');
         actualizarFecha();
-        cargarDatosCierre();
+        await cargarDatosCierre();
         
         const efectivoContado = document.getElementById('efectivoContado');
         if (efectivoContado) {
             efectivoContado.addEventListener('input', verificarCaja);
         }
         
-        console.log('✅ Página de cierre inicializada');
+        console.log('✅ Cierre inicializado');
     });
 
+    // Exponer funciones globales
     window.cargarDatosCierre = cargarDatosCierre;
     window.verificarCaja = verificarCaja;
     window.confirmarCierre = confirmarCierre;
+    window.confirmarCierreAccion = confirmarCierreAccion;
+    window.cerrarModalCierre = cerrarModalCierre;
     window.formatearNumero = formatearNumero;
     window.formatearNumeroCompleto = formatearNumeroCompleto;
-    window.getAperturaActual = getAperturaActual;
-    window.DB = DB;
-    </script>
+</script>
 </body>
 </html>
